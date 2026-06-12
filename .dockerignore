@@ -1,0 +1,15 @@
+.git/
+.github/
+
+**/bin/
+**/obj/
+
+.vs/
+.vscode/
+
+infra/
+README.md
+
+*.user
+*.suo
+*.log

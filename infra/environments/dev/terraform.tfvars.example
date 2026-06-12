@@ -1,0 +1,19 @@
+# Copy this file to terraform.tfvars and update with your values
+# This file is for reference only and should not contain actual secrets
+
+location                     = "polandcentral"
+resource_group_name          = "rg-guestbook-dev"
+container_registry_name      = "acrguestbookdev"
+acr_sku                      = "Basic"
+sql_server_name              = "sqlserver-guestbook-dev"
+sql_database_name            = "sqldb-guestbook-dev"
+sql_admin_login              = "sqladmin"
+sql_admin_password           = "P@ssw0rd1234!"  # Change to secure password
+sql_sku_name                 = "Basic"
+key_vault_name               = "kv-guestbook-dev"
+container_app_name           = "app-guestbook-dev"
+container_app_environment    = "cae-guestbook-dev"
+image_name                   = "guestbook"
+image_tag                    = "latest"
+log_analytics_workspace_name = "law-guestbook-dev"
+log_analytics_sku            = "PerGB2018"

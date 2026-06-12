@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  guestbook-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5000
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;User Id=sa;Password=Your_Strong_Password_Here;Database=GuestBook;TrustServerCertificate=True;
+    depends_on:
+      - sqlserver
+    networks:
+      - guestbook-network
+    volumes:
+      - ./src/Guestbook.Api:/app/src/Guestbook.Api
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=Your_Strong_Password_Here
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    networks:
+      - guestbook-network
+    volumes:
+      - mssql-data:/var/opt/mssql
+
+networks:
+  guestbook-network:
+    driver: bridge
+
+volumes:
+  mssql-data:

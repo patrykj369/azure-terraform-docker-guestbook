@@ -1,0 +1,53 @@
+# Build results
+bin/
+obj/
+
+# Generated files
+Migrations/
+
+# Visual Studio
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+
+# ReSharper
+.resharper
+*.resharper.user
+.resharper/
+
+# Test Results
+TestResults/
+
+# Local environment files (don't commit these!)
+appsettings.Development.json
+appsettings.Production.json
+*.local.json
+
+# Database files
+*.mdf
+*.ldf
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Node modules (if using npm/yarn)
+node_modules/
+package-lock.json
+yarn.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+*.swp
+*.swo
+*~
+.idea/
