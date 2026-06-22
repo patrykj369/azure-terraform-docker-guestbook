@@ -14,7 +14,7 @@ terraform {
   # terraform init -backend-config="resource_group_name=..." \
   #                 -backend-config="storage_account_name=..." \
   #                 -backend-config="container_name=..." \
-  #                 -backend-config="key=dev.tfstate" \
+  #                 -backend-config="key=stage.tfstate" \
   #                 -backend-config="use_oidc=true"
   backend "azurerm" {
     use_oidc = true
@@ -35,4 +35,3 @@ provider "azurerm" {
   # Set by GitHub Actions when using azure/login@v2
   skip_provider_registration = false
 }
-

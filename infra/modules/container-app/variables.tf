@@ -26,7 +26,7 @@ variable "image_name" {
 variable "image_tag" {
   description = "Container image tag"
   type        = string
-  default     = "latest"
+  default     = "initial"
 }
 
 variable "environment" {
@@ -43,4 +43,19 @@ variable "common_tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)
   default     = {}
+}
+
+variable "managed_identity_id" {
+  description = "ID of the user-assigned managed identity"
+  type        = string
+}
+
+variable "environment_variables" {
+  description = "Environment variables for the container"
+  type = list(object({
+    name      = string
+    value     = optional(string)
+    secret_ref = optional(string)
+  }))
+  default = []
 }

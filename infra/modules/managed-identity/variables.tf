@@ -1,5 +1,5 @@
 variable "name" {
-  description = "Name of the container registry"
+  description = "Name of the user-assigned managed identity"
   type        = string
 }
 
@@ -11,12 +11,6 @@ variable "resource_group_name" {
 variable "location" {
   description = "Azure region"
   type        = string
-}
-
-variable "sku" {
-  description = "SKU of the container registry"
-  type        = string
-  default     = "Basic"
 }
 
 variable "environment" {
@@ -34,10 +28,3 @@ variable "common_tags" {
   type        = map(string)
   default     = {}
 }
-
-variable "app_managed_identity_principal_id" {
-  description = "Principal ID of the application's managed identity (for AcrPull)"
-  type        = string
-  default     = ""
-}
-

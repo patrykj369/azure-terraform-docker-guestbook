@@ -12,7 +12,7 @@ locals {
 }
 
 module "resource_group" {
-  source = "../modules/resource-group"
+  source = "../../modules/resource-group"
 
   name            = var.resource_group_name
   location        = var.location
@@ -21,20 +21,32 @@ module "resource_group" {
   common_tags     = local.common_tags
 }
 
-module "container_registry" {
-  source = "../modules/container-registry"
+module "managed_identity" {
+  source = "../../modules/managed-identity"
 
-  name                = var.container_registry_name
+  name                = "mid-${local.project}-${local.environment}"
   resource_group_name = module.resource_group.name
   location            = var.location
-  sku                 = var.acr_sku
   environment         = local.environment
   project             = local.project
   common_tags         = local.common_tags
 }
 
+module "container_registry" {
+  source = "../../modules/container-registry"
+
+  name                                 = var.container_registry_name
+  resource_group_name                  = module.resource_group.name
+  location                             = var.location
+  sku                                  = var.acr_sku
+  environment                          = local.environment
+  project                              = local.project
+  common_tags                          = local.common_tags
+  app_managed_identity_principal_id    = module.managed_identity.principal_id
+}
+
 module "sql_database" {
-  source = "../modules/sql-database"
+  source = "../../modules/sql-database"
 
   server_name         = var.sql_server_name
   database_name       = var.sql_database_name
@@ -49,19 +61,21 @@ module "sql_database" {
 }
 
 module "key_vault" {
-  source = "../modules/key-vault"
+  source = "../../modules/key-vault"
 
-  name                = var.key_vault_name
-  resource_group_name = module.resource_group.name
-  location            = var.location
-  tenant_id           = data.azurerm_client_config.current.tenant_id
-  environment         = local.environment
-  project             = local.project
-  common_tags         = local.common_tags
+  name                                 = var.key_vault_name
+  resource_group_name                  = module.resource_group.name
+  location                             = var.location
+  tenant_id                            = data.azurerm_client_config.current.tenant_id
+  environment                          = local.environment
+  project                              = local.project
+  common_tags                          = local.common_tags
+  app_managed_identity_principal_id    = module.managed_identity.principal_id
+  app_managed_identity_name            = module.managed_identity.id
 }
 
 module "container_app" {
-  source = "../modules/container-app"
+  source = "../../modules/container-app"
 
   name                        = var.container_app_name
   resource_group_name         = module.resource_group.name
@@ -72,10 +86,11 @@ module "container_app" {
   environment                 = local.environment
   project                     = local.project
   common_tags                 = local.common_tags
+  managed_identity_id         = module.managed_identity.id
 }
 
 module "monitoring" {
-  source = "../modules/monitoring"
+  source = "../../modules/monitoring"
 
   name                = var.log_analytics_workspace_name
   resource_group_name = module.resource_group.name

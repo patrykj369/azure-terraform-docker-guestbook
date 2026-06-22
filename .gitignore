@@ -1,0 +1,322 @@
+# ====================
+# TERRAFORM
+# ====================
+
+# Local .terraform directories
+**/.terraform/*
+
+# .terraform.lock.hcl MUST be committed (standardizes provider versions)
+!**/.terraform.lock.hcl
+
+# .tfstate files (NEVER commit - contains secrets!)
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/crash.log
+**/crash.*.log
+
+# Exclude all .tfvars files, which might contain sensitive data
+**/terraform.tfvars
+**/terraform.tfvars.json
+
+# Ignore override files
+**/override.tf
+**/override.tf.json
+**/override_files/
+**/terraform_override.tf
+**/terraform_override.tf.json
+
+# Ignore CLI configuration files
+**/.terraformrc
+
+# Ignore plan files
+**/*.tfplan
+
+# Local .env files (may contain secrets)
+**/.env
+**/.env.local
+**/.env.*.local
+
+# ====================
+# DOCKER
+# ====================
+
+.docker/
+.dockerignore
+docker-compose.override.yml
+
+# ====================
+# .NET / VISUAL STUDIO
+# ====================
+
+bin/
+obj/
+.vs/
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+
+# Visual Studio cache/options
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# ReSharper is JBRA coding assistance in C#
+.resharper
+.resharper.user
+.resharper/
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# User-specific files
+*.rsuser
+
+# Build folder
+publish/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+
+# Dependencies
+packages/
+.paket/content/
+paket-files/
+
+# ====================
+# DATABASES
+# ====================
+
+*.mdf
+*.ldf
+*.ndf
+*.sqlite
+*.sqlite3
+*.db
+
+# ====================
+# LOGS
+# ====================
+
+logs/
+*.log
+!*.log.example
+log/
+Logs/
+*.log
+
+# ====================
+# IDE & EDITORS
+# ====================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim
+*.swp
+*.swo
+*~
+.swp
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ====================
+# OS FILES
+# ====================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Desktop.ini
+[Dd]esktop.ini
+ehthumbs.db
+
+# Linux
+.directory
+
+# ====================
+# NODE / NPM / YARN
+# ====================
+
+node_modules/
+npm-debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+yarn.lock
+package-lock.json
+.npm
+.eslintcache
+
+# ====================
+# PYTHON
+# ====================
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ====================
+# BUILD ARTIFACTS
+# ====================
+
+dist/
+build/
+*.egg-info/
+*.egg
+
+# ====================
+# TEMPORARY FILES
+# ====================
+
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.~*
+
+# ====================
+# ENVIRONMENT & SECRETS
+# ====================
+
+# Environment files (NEVER commit!)
+.env
+.env.local
+.env.*.local
+.env.*.secret
+
+# Credentials
+credentials.json
+*.pem
+*.key
+*.crt
+id_rsa
+id_rsa.pub
+
+# ====================
+# TEST RESULTS
+# ====================
+
+TestResults/
+coverage/
+*.coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# ====================
+# APPLICATION SPECIFIC
+# ====================
+
+# Local settings
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Local.json
+*.local.json
+
+# Database backups
+*.bak
+
+# ====================
+# MISC
+# ====================
+
+# Backup files
+*.backup
+*.bkp
+
+# Compressed files
+*.zip
+*.7z
+*.rar
+*.tar.gz
+*.tgz
+
+# Git
+.git/
+.gitmodules
+
+# GitHub
+.github/workflows/debug.log
+
+# ====================
+# ALLOW SPECIFIC FILES
+# ====================
+
+# Override .gitignore rules for example/template files that should be committed
+# !infra/envs/*/terraform.tfvars.example

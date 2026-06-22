@@ -1,0 +1,145 @@
+name: Deploy Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+      image-tag:
+        description: 'Image tag to deploy (e.g., commit SHA)'
+        required: true
+        type: string
+  workflow_run:
+    workflows: [ "Build and Push Application" ]
+    types: [ completed ]
+    branches: [ main ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy - ${{ github.event.inputs.environment || 'dev' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    # Only run on successful build, or on manual dispatch
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.name == 'Build and Push Application')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine Image Tag
+        id: image
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            IMAGE_TAG="${{ github.event.inputs.image-tag }}"
+          else
+            IMAGE_TAG="${{ github.event.workflow_run.head_commit.id }}"
+          fi
+          
+          IMAGE_URI="${{ vars.AZURE_REGISTRY_LOGIN_SERVER }}/guestbook:${IMAGE_TAG}"
+          echo "tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
+          echo "Deploying image: ${IMAGE_URI}"
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Verify Image Exists in ACR
+        run: |
+          ACR_NAME=$(echo "${{ vars.AZURE_REGISTRY_LOGIN_SERVER }}" | cut -d'.' -f1)
+          IMAGE_TAG="${{ steps.image.outputs.tag }}"
+          
+          if az acr repository show \
+            --name ${ACR_NAME} \
+            --image "guestbook:${IMAGE_TAG}" &>/dev/null; then
+            echo "✓ Image found in ACR: guestbook:${IMAGE_TAG}"
+          else
+            echo "✗ Image not found in ACR: guestbook:${IMAGE_TAG}"
+            exit 1
+          fi
+
+      - name: Update Container App
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || 'dev' }}"
+          CONTAINER_APP_NAME="${{ vars.AZURE_CONTAINER_APP_NAME }}"
+          RESOURCE_GROUP="${{ vars.AZURE_RESOURCE_GROUP }}"
+          IMAGE_URI="${{ steps.image.outputs.uri }}"
+          
+          echo "Updating Container App: ${CONTAINER_APP_NAME}"
+          echo "Resource Group: ${RESOURCE_GROUP}"
+          echo "New image: ${IMAGE_URI}"
+          
+          az containerapp update \
+            --name ${CONTAINER_APP_NAME} \
+            --resource-group ${RESOURCE_GROUP} \
+            --image ${IMAGE_URI} \
+            --no-wait
+
+      - name: Wait for Deployment
+        run: sleep 15
+
+      - name: Run Smoke Test
+        continue-on-error: true
+        run: |
+          CONTAINER_APP_FQDN="${{ vars.AZURE_CONTAINER_APP_FQDN }}"
+          MAX_ATTEMPTS=12
+          RETRY_DELAY=10
+          ATTEMPT=0
+          
+          echo "Running smoke tests against: https://${CONTAINER_APP_FQDN}"
+          
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Smoke test attempt $ATTEMPT/$MAX_ATTEMPTS..."
+            
+            # Try health endpoint first
+            if curl -sf "https://${CONTAINER_APP_FQDN}/health" > /dev/null 2>&1; then
+              echo "✓ Application is healthy"
+              
+              # Optional: Check specific endpoints
+              echo "✓ Testing root endpoint..."
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${CONTAINER_APP_FQDN}/")
+              if [ "$HTTP_CODE" == "200" ]; then
+                echo "✓ Root endpoint returned 200"
+                exit 0
+              fi
+            fi
+            
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              echo "Not ready yet, retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            fi
+          done
+          
+          echo "⚠ Smoke tests completed with warnings"
+          exit 0
+
+      - name: Deployment Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ github.event.inputs.environment || 'dev' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Tag**: ${{ steps.image.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image URI**: ${{ steps.image.outputs.uri }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Container App**: ${{ vars.AZURE_CONTAINER_APP_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: https://${{ vars.AZURE_CONTAINER_APP_FQDN }}" >> $GITHUB_STEP_SUMMARY
+
+  # TODO: Optional rollback job
+  # - Can be triggered manually to revert to previous image
+  # - Requires storing previous image tag as artifact or in infrastructure

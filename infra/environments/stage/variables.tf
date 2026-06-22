@@ -7,14 +7,14 @@ variable "location" {
 variable "resource_group_name" {
   description = "Name of the Azure resource group"
   type        = string
-  default     = "rg-guestbook-dev"
+  default     = "rg-guestbook-stage"
 }
 
 # Container Registry Variables
 variable "container_registry_name" {
   description = "Name of the Azure Container Registry"
   type        = string
-  default     = "acrguestbookdev"
+  default     = "acrguestbookstage"
 }
 
 variable "acr_sku" {
@@ -27,13 +27,13 @@ variable "acr_sku" {
 variable "sql_server_name" {
   description = "Name of the SQL Server"
   type        = string
-  default     = "sqlserver-guestbook-dev"
+  default     = "sqlserver-guestbook-stage"
 }
 
 variable "sql_database_name" {
   description = "Name of the SQL Database"
   type        = string
-  default     = "sqldb-guestbook-dev"
+  default     = "sqldb-guestbook-stage"
 }
 
 variable "sql_admin_login" {
@@ -51,27 +51,27 @@ variable "sql_admin_password" {
 variable "sql_sku_name" {
   description = "SKU for SQL Database"
   type        = string
-  default     = "Basic"
+  default     = "Standard"
 }
 
 # Key Vault Variables
 variable "key_vault_name" {
   description = "Name of the Key Vault"
   type        = string
-  default     = "kv-guestbook-dev"
+  default     = "kv-guestbook-stage"
 }
 
 # Container App Variables
 variable "container_app_name" {
   description = "Name of the Container App"
   type        = string
-  default     = "app-guestbook-dev"
+  default     = "app-guestbook-stage"
 }
 
 variable "container_app_environment" {
   description = "Container App Environment name"
   type        = string
-  default     = "cae-guestbook-dev"
+  default     = "cae-guestbook-stage"
 }
 
 variable "image_name" {
@@ -90,7 +90,7 @@ variable "image_tag" {
 variable "log_analytics_workspace_name" {
   description = "Name of the Log Analytics Workspace"
   type        = string
-  default     = "law-guestbook-dev"
+  default     = "law-guestbook-stage"
 }
 
 variable "log_analytics_sku" {

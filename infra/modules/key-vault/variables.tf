@@ -33,3 +33,16 @@ variable "common_tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "app_managed_identity_principal_id" {
+  description = "Principal ID of the application's managed identity (for Key Vault access)"
+  type        = string
+  default     = ""
+}
+
+variable "app_managed_identity_name" {
+  description = "Name of the application's managed identity"
+  type        = string
+  default     = ""
+}
+
