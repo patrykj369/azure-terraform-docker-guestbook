@@ -14,11 +14,11 @@ locals {
 module "resource_group" {
   source = "../../modules/resource-group"
 
-  name            = var.resource_group_name
-  location        = var.location
-  environment     = local.environment
-  project         = local.project
-  common_tags     = local.common_tags
+  name        = var.resource_group_name
+  location    = var.location
+  environment = local.environment
+  project     = local.project
+  common_tags = local.common_tags
 }
 
 module "managed_identity" {
@@ -35,14 +35,14 @@ module "managed_identity" {
 module "container_registry" {
   source = "../../modules/container-registry"
 
-  name                                 = var.container_registry_name
-  resource_group_name                  = module.resource_group.name
-  location                             = var.location
-  sku                                  = var.acr_sku
-  environment                          = local.environment
-  project                              = local.project
-  common_tags                          = local.common_tags
-  app_managed_identity_principal_id    = module.managed_identity.principal_id
+  name                              = var.container_registry_name
+  resource_group_name               = module.resource_group.name
+  location                          = var.location
+  sku                               = var.acr_sku
+  environment                       = local.environment
+  project                           = local.project
+  common_tags                       = local.common_tags
+  app_managed_identity_principal_id = module.managed_identity.principal_id
 }
 
 module "sql_database" {
@@ -63,30 +63,30 @@ module "sql_database" {
 module "key_vault" {
   source = "../../modules/key-vault"
 
-  name                                 = var.key_vault_name
-  resource_group_name                  = module.resource_group.name
-  location                             = var.location
-  tenant_id                            = data.azurerm_client_config.current.tenant_id
-  environment                          = local.environment
-  project                              = local.project
-  common_tags                          = local.common_tags
-  app_managed_identity_principal_id    = module.managed_identity.principal_id
-  app_managed_identity_name            = module.managed_identity.id
+  name                              = var.key_vault_name
+  resource_group_name               = module.resource_group.name
+  location                          = var.location
+  tenant_id                         = data.azurerm_client_config.current.tenant_id
+  environment                       = local.environment
+  project                           = local.project
+  common_tags                       = local.common_tags
+  app_managed_identity_principal_id = module.managed_identity.principal_id
+  app_managed_identity_name         = module.managed_identity.id
 }
 
 module "container_app" {
   source = "../../modules/container-app"
 
-  name                        = var.container_app_name
-  resource_group_name         = module.resource_group.name
-  location                    = var.location
-  container_app_environment   = var.container_app_environment
-  image_name                  = "${module.container_registry.login_server}/${var.image_name}"
-  image_tag                   = var.image_tag
-  environment                 = local.environment
-  project                     = local.project
-  common_tags                 = local.common_tags
-  managed_identity_id         = module.managed_identity.id
+  name                      = var.container_app_name
+  resource_group_name       = module.resource_group.name
+  location                  = var.location
+  container_app_environment = var.container_app_environment
+  image_name                = "${module.container_registry.login_server}/${var.image_name}"
+  image_tag                 = var.image_tag
+  environment               = local.environment
+  project                   = local.project
+  common_tags               = local.common_tags
+  managed_identity_id       = module.managed_identity.id
 }
 
 module "monitoring" {

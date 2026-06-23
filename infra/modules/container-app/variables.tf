@@ -53,8 +53,8 @@ variable "managed_identity_id" {
 variable "environment_variables" {
   description = "Environment variables for the container"
   type = list(object({
-    name      = string
-    value     = optional(string)
+    name       = string
+    value      = optional(string)
     secret_ref = optional(string)
   }))
   default = []

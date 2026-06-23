@@ -6,7 +6,7 @@ resource "azurerm_key_vault" "main" {
   tenant_id                   = var.tenant_id
   sku_name                    = "standard"
   purge_protection_enabled    = false
-  enable_rbac_authorization   = true  # Use RBAC instead of access policies
+  enable_rbac_authorization   = true # Use RBAC instead of access policies
 
   tags = var.common_tags
 }
@@ -16,9 +16,9 @@ resource "azurerm_key_vault" "main" {
 resource "azurerm_role_assignment" "app_kv_secrets_user" {
   count = var.app_managed_identity_principal_id != "" ? 1 : 0
 
-  scope              = azurerm_key_vault.main.id
+  scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets User"
-  principal_id       = var.app_managed_identity_principal_id
+  principal_id         = var.app_managed_identity_principal_id
 }
 
 data "azurerm_client_config" "current" {}

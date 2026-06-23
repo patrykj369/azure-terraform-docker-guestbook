@@ -10,10 +10,10 @@ resource "azurerm_mssql_server" "main" {
 }
 
 resource "azurerm_mssql_database" "main" {
-  name           = var.database_name
-  server_id      = azurerm_mssql_server.main.id
-  collation      = "SQL_Latin1_General_CP1_CI_AS"
-  sku_name       = var.sku_name
+  name                 = var.database_name
+  server_id            = azurerm_mssql_server.main.id
+  collation            = "SQL_Latin1_General_CP1_CI_AS"
+  sku_name             = var.sku_name
   storage_account_type = "Local"
 
   tags = var.common_tags
