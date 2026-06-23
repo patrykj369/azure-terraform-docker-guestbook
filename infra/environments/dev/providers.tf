@@ -7,15 +7,7 @@ terraform {
   }
 
   required_version = ">= 1.0"
-
-  # Backend configuration for Azure Storage
-  # Uses OIDC authentication instead of connection strings or access keys
-  # Configure backend via CLI: 
-  # terraform init -backend-config="resource_group_name=..." \
-  #                 -backend-config="storage_account_name=..." \
-  #                 -backend-config="container_name=..." \
-  #                 -backend-config="key=dev.tfstate" \
-  #                 -backend-config="use_oidc=true"
+  
   backend "azurerm" {
     use_oidc = true
   }
@@ -30,9 +22,5 @@ provider "azurerm" {
       purge_soft_deleted_secrets_on_destroy = false
     }
   }
-
-  # Provider will use OIDC token from ARM_OIDC_TOKEN environment variable
-  # Set by GitHub Actions when using azure/login@v2
-  skip_provider_registration = false
 }
 
