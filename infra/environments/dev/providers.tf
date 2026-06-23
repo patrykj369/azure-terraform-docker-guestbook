@@ -1,4 +1,6 @@
 terraform {
+  required_version = ">= 1.5.0"
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -6,21 +8,14 @@ terraform {
     }
   }
 
-  required_version = ">= 1.0"
-
-  backend "azurerm" {
-    use_oidc = true
-  }
+  backend "azurerm" {}
 }
 
 provider "azurerm" {
   features {
     key_vault {
-      # Recover soft-deleted Key Vaults during apply
-      recover_soft_deleted_key_vaults = true
-      # Purge soft-deleted secrets during destroy
+      recover_soft_deleted_key_vaults       = true
       purge_soft_deleted_secrets_on_destroy = false
     }
   }
 }
-
