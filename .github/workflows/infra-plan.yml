@@ -6,15 +6,6 @@ on:
       - 'infra/**'
       - '.github/workflows/infra-plan.yml'
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to plan'
-        required: true
-        type: choice
-        options:
-          - dev
-          - stage
-          - prod
 
 permissions:
   id-token: write
@@ -23,12 +14,9 @@ permissions:
 
 jobs:
   terraform-plan:
-    name: Terraform Plan - ${{ matrix.environment }}
+    name: Terraform Plan - dev
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment: [dev, stage, prod]
-    environment: ${{ matrix.environment }}
+    environment: dev
     
     env:
       ARM_USE_OIDC: true
@@ -58,7 +46,7 @@ jobs:
         run: terraform fmt -check -recursive infra/
 
       - name: Terraform Init
-        working-directory: infra/environments/${{ matrix.environment }}
+        working-directory: infra/environments/dev
         env:
           ARM_USE_OIDC: true
           TF_VAR_sql_admin_password: ${{ secrets.SQL_ADMIN_PASSWORD }}
@@ -70,15 +58,15 @@ jobs:
             -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
-            -backend-config="key=${{ matrix.environment }}.tfstate" \
+            -backend-config="key=dev.tfstate" \
             -backend-config="use_oidc=true"
 
       - name: Terraform Validate
-        working-directory: infra/environments/${{ matrix.environment }}
+        working-directory: infra/environments/dev
         run: terraform validate
 
       - name: Terraform Plan
-        working-directory: infra/environments/${{ matrix.environment }}
+        working-directory: infra/environments/dev
         env:
           ARM_USE_OIDC: true
           TF_VAR_sql_admin_password: ${{ secrets.SQL_ADMIN_PASSWORD }}
@@ -90,18 +78,18 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const terraform_plan = fs.readFileSync('infra/environments/${{ matrix.environment }}/tfplan', 'utf8');
+            const terraform_plan = fs.readFileSync('infra/environments/dev/tfplan', 'utf8');
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## Terraform Plan - ${{ matrix.environment }}\n\n\`\`\`\n${terraform_plan}\n\`\`\``
+              body: `## Terraform Plan - dev\n\n\`\`\`\n${terraform_plan}\n\`\`\``
             });
 
       - name: Save Plan Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-${{ matrix.environment }}
-          path: infra/environments/${{ matrix.environment }}/tfplan
+          name: tfplan-dev
+          path: infra/environments/dev/tfplan
           retention-days: 7
