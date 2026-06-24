@@ -17,9 +17,10 @@ jobs:
     name: Terraform Plan - dev
     runs-on: ubuntu-latest
     environment: dev
-    
+
     env:
       ARM_USE_OIDC: true
+      ARM_USE_AZUREAD: true
       ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -32,7 +33,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: '=> 1.5.0'
+          terraform_version: '1.5.7'
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
@@ -40,26 +41,16 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          
 
       - name: Terraform Format Check
         run: terraform fmt -check -recursive infra/
 
       - name: Terraform Init
         working-directory: infra/environments/dev
-        env:
-          ARM_USE_OIDC: true
-          TF_VAR_sql_admin_password: ${{ secrets.SQL_ADMIN_PASSWORD }}
-          TF_VAR_azure_resource_group: ${{ vars.TF_STATE_RESOURCE_GROUP }}
-          TF_VAR_azure_storage_account: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
-          TF_VAR_azure_container_name: ${{ vars.TF_STATE_CONTAINER }}
         run: |
           terraform init \
-            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
-            -backend-config="key=dev.tfstate" \
-            -backend-config="use_oidc=true"
+            -backend-config="use_oidc=true" \
+            -backend-config="use_azuread_auth=true"
 
       - name: Terraform Validate
         working-directory: infra/environments/dev
@@ -67,10 +58,11 @@ jobs:
 
       - name: Terraform Plan
         working-directory: infra/environments/dev
-        env:
-          ARM_USE_OIDC: true
-          TF_VAR_sql_admin_password: ${{ secrets.SQL_ADMIN_PASSWORD }}
-        run: terraform plan -no-color -out=tfplan
+        run: terraform plan -input=false -no-color -out=tfplan
+
+      - name: Terraform Show Plan
+        working-directory: infra/environments/dev
+        run: terraform show -no-color tfplan > tfplan.txt
 
       - name: Comment PR with Plan
         if: github.event_name == 'pull_request'
@@ -78,8 +70,8 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const terraform_plan = fs.readFileSync('infra/environments/dev/tfplan', 'utf8');
-            
+            const terraform_plan = fs.readFileSync('infra/environments/dev/tfplan.txt', 'utf8');
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
