@@ -14,11 +14,11 @@ resource "azurerm_key_vault" "main" {
 # Grant Key Vault Secrets User role to application managed identity
 # This allows the application to read secrets at runtime
 resource "azurerm_role_assignment" "app_kv_secrets_user" {
-  count = var.app_managed_identity_principal_id != "" ? 1 : 0
-
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = var.app_managed_identity_principal_id
+
+  skip_service_principal_aad_check = true
 }
 
 data "azurerm_client_config" "current" {}
