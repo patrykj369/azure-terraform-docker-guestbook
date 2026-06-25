@@ -46,3 +46,9 @@ variable "app_managed_identity_name" {
   default     = ""
 }
 
+variable "key_vault_admin_principal_ids" {
+  description = "List of Entra ID object IDs that should have Key Vault Administrator role on this Key Vault."
+  type        = list(string)
+  default     = []
+}
+

@@ -21,5 +21,13 @@ resource "azurerm_role_assignment" "app_kv_secrets_user" {
   skip_service_principal_aad_check = true
 }
 
+resource "azurerm_role_assignment" "key_vault_admins" {
+  for_each = toset(var.key_vault_admin_principal_ids)
+
+  scope                = azurerm_key_vault.main.id
+  role_definition_name = "Key Vault Administrator"
+  principal_id         = each.value
+}
+
 data "azurerm_client_config" "current" {}
 

@@ -72,6 +72,8 @@ module "key_vault" {
   common_tags                       = local.common_tags
   app_managed_identity_principal_id = module.managed_identity.principal_id
   app_managed_identity_name         = module.managed_identity.id
+
+  key_vault_admin_principal_ids = var.key_vault_admin_principal_ids
 }
 
 # module "container_app" {

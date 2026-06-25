@@ -61,6 +61,12 @@ variable "key_vault_name" {
   default     = "kv-guestbook-dev"
 }
 
+variable "key_vault_admin_principal_ids" {
+  description = "List of Entra ID object IDs that should have Key Vault Administrator role on the Key Vault."
+  type        = list(string)
+  default     = []
+}
+
 # Container App Variables
 variable "container_app_name" {
   description = "Name of the Container App"

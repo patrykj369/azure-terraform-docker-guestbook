@@ -7,6 +7,9 @@ sql_database_name            = "sqldb-guestbook-dev"
 sql_admin_login              = "sqladmin"
 sql_sku_name                 = "Basic"
 key_vault_name               = "kv-guestbook-dev"
+key_vault_admin_principal_ids = [
+  "e3037748-4f2a-439e-bc52-b9eeb84968e4"
+]
 container_app_name           = "app-guestbook-dev"
 container_app_environment    = "cae-guestbook-dev"
 image_name                   = "guestbook"
