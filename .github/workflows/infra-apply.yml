@@ -2,15 +2,7 @@ name: Terraform Apply
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to apply'
-        required: true
-        type: choice
-        options:
-          - dev
-          - stage
-          - prod
+  workflow_call:
 
 permissions:
   id-token: write
@@ -18,9 +10,21 @@ permissions:
 
 jobs:
   terraform-apply:
-    name: Terraform Apply - ${{ github.event.inputs.environment }}
+    name: Terraform Apply - dev
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment }}
+    environment: dev
+
+    concurrency:
+      group: terraform-apply-dev
+      cancel-in-progress: false
+
+    env:
+      ARM_USE_OIDC: true
+      ARM_USE_AZUREAD: true
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_sql_admin_password: ${{ secrets.SQL_ADMIN_PASSWORD }}
 
     steps:
       - name: Checkout code
@@ -29,59 +33,39 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: '~> 1.0'
+          terraform_version: '1.5.7'
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive infra/
 
       - name: Terraform Init
-        working-directory: infra/environments/${{ github.event.inputs.environment }}
-        env:
-          ARM_USE_OIDC: true
-          ARM_OIDC_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
-          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        working-directory: infra/environments/dev
         run: |
           terraform init \
-            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
-            -backend-config="key=${{ github.event.inputs.environment }}.tfstate" \
-            -backend-config="use_oidc=true"
+            -backend-config="use_oidc=true" \
+            -backend-config="use_azuread_auth=true"
+
+      - name: Terraform Validate
+        working-directory: infra/environments/dev
+        run: terraform validate
 
       - name: Terraform Plan
-        working-directory: infra/environments/${{ github.event.inputs.environment }}
-        env:
-          ARM_USE_OIDC: true
-          ARM_OIDC_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
-          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-        run: terraform plan -no-color -out=tfplan
+        working-directory: infra/environments/dev
+        run: terraform plan -input=false -no-color -out=tfplan
 
       - name: Terraform Apply
-        working-directory: infra/environments/${{ github.event.inputs.environment }}
-        env:
-          ARM_USE_OIDC: true
-          ARM_OIDC_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
-          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-        run: terraform apply -no-color tfplan
+        working-directory: infra/environments/dev
+        run: terraform apply -input=false -no-color -auto-approve tfplan
 
       - name: Output Infrastructure Details
-        working-directory: infra/environments/${{ github.event.inputs.environment }}
-        env:
-          ARM_USE_OIDC: true
-          ARM_OIDC_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
-          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        working-directory: infra/environments/dev
         run: |
           echo "## Infrastructure Outputs" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
