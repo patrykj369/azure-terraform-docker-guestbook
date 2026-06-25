@@ -20,6 +20,7 @@ jobs:
   build-and-push:
     name: Build and Push Image
     runs-on: ubuntu-latest
+    environment: dev
 
     outputs:
       image-uri: ${{ steps.build.outputs.image-uri }}
