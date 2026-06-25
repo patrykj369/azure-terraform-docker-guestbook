@@ -74,20 +74,20 @@ module "key_vault" {
   app_managed_identity_name         = module.managed_identity.id
 }
 
-module "container_app" {
-  source = "../../modules/container-app"
+# module "container_app" {
+#   source = "../../modules/container-app"
 
-  name                      = var.container_app_name
-  resource_group_name       = module.resource_group.name
-  location                  = var.location
-  container_app_environment = var.container_app_environment
-  image_name                = "${module.container_registry.login_server}/${var.image_name}"
-  image_tag                 = var.image_tag
-  environment               = local.environment
-  project                   = local.project
-  common_tags               = local.common_tags
-  managed_identity_id       = module.managed_identity.id
-}
+#   name                      = var.container_app_name
+#   resource_group_name       = module.resource_group.name
+#   location                  = var.location
+#   container_app_environment = var.container_app_environment
+#   image_name                = "${module.container_registry.login_server}/${var.image_name}"
+#   image_tag                 = var.image_tag
+#   environment               = local.environment
+#   project                   = local.project
+#   common_tags               = local.common_tags
+#   managed_identity_id       = module.managed_identity.id
+# }
 
 module "monitoring" {
   source = "../../modules/monitoring"

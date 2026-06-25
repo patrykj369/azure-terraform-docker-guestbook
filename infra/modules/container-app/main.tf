@@ -24,15 +24,6 @@ resource "azurerm_container_app" "main" {
       cpu    = "0.5"
       memory = "1Gi"
 
-      # Example: Add environment variables with Key Vault references
-      # Environment variables can reference Key Vault secrets via secretref:
-      # dynamic "env" {
-      #   for_each = var.environment_variables
-      #   content {
-      #     name        = env.value.name
-      #     secret_name = env.value.secret_ref
-      #   }
-      # }
     }
   }
 
