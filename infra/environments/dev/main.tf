@@ -79,10 +79,10 @@ module "key_vault" {
 module "container_app_environment" {
   source = "../../modules/container-app-environment"
 
-  container_app_environment = var.container_app_environment
-  resource_group_name       = module.resource_group.name
-  location                  = var.location
-  common_tags               = local.common_tags
+  container_app_environment_name = var.container_app_environment_name
+  resource_group_name            = module.resource_group.name
+  location                       = var.location
+  common_tags                    = local.common_tags
 }
 
 module "monitoring" {

@@ -1,4 +1,4 @@
-variable "container_app_environment" {
+variable "container_app_environment_name" {
   description = "Name of the container app environment"
   type        = string
 }

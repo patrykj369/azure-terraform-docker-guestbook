@@ -53,9 +53,9 @@ output "key_vault_uri" {
   value       = module.key_vault.vault_uri
 }
 
-output "container_app_environment_name" {
-  description = "Name of the Container App Environment"
-  value       = module.container_app_environment.container_app_environment_name
+output "container_app_environment_id" {
+  description = "ID of the Container App Environment"
+  value       = module.container_app_environment.environment_id
 }
 
 output "log_analytics_workspace_id" {

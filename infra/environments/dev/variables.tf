@@ -54,7 +54,6 @@ variable "sql_sku_name" {
   default     = "Basic"
 }
 
-# Key Vault Variables
 variable "key_vault_name" {
   description = "Name of the Key Vault"
   type        = string
@@ -67,32 +66,12 @@ variable "key_vault_admin_principal_ids" {
   default     = []
 }
 
-# Container App Variables
-variable "container_app_name" {
-  description = "Name of the Container App"
-  type        = string
-  default     = "app-guestbook-dev"
-}
-
-variable "container_app_environment" {
+variable "container_app_environment_name" {
   description = "Container App Environment name"
   type        = string
   default     = "cae-guestbook-dev"
 }
 
-variable "image_name" {
-  description = "Container image name"
-  type        = string
-  default     = "guestbook"
-}
-
-variable "image_tag" {
-  description = "Container image tag"
-  type        = string
-  default     = "initial"
-}
-
-# Monitoring Variables
 variable "log_analytics_workspace_name" {
   description = "Name of the Log Analytics Workspace"
   type        = string
