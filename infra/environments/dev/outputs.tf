@@ -53,18 +53,11 @@ output "key_vault_uri" {
   value       = module.key_vault.vault_uri
 }
 
-# Container App Outputs
-# output "container_app_id" {
-#   description = "ID of the Container App"
-#   value       = module.container_app.id
-# }
+output "container_app_environment_name" {
+  description = "Name of the Container App Environment"
+  value       = module.container_app_environment.container_app_environment_name
+}
 
-# output "container_app_url" {
-#   description = "URL of the Container App"
-#   value       = module.container_app.fqdn
-# }
-
-# Log Analytics Outputs
 output "log_analytics_workspace_id" {
   description = "ID of the Log Analytics Workspace"
   value       = module.monitoring.workspace_id
