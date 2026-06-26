@@ -4,29 +4,39 @@ on:
   workflow_dispatch:
     inputs:
       image-tag:
-        description: 'Image tag to deploy (e.g., commit SHA)'
+        description: 'Image tag to deploy, e.g. commit SHA'
         required: true
         type: string
   workflow_run:
-    workflows: [ "Build and Push Application" ]
-    types: [ completed ]
-    branches: [ main ]
+    workflows: ["Build and Push Application"]
+    types: [completed]
+    branches: [main]
 
 permissions:
   id-token: write
   contents: read
 
 env:
-  IMAGE_NAME: guestbook
-  AZURE_REGISTRY_LOGIN_SERVER: ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}
-  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
-  AZURE_CONTAINER_APP_NAME: ${{ vars.AZURE_CONTAINER_APP_NAME }}
-  AZURE_CONTAINER_APP_ENVIRONMENT_NAME: ${{ vars.AZURE_CONTAINER_APP_ENVIRONMENT_NAME }}
+  IMAGE_NAME: ${{ vars.IMAGE_NAME || 'guestbook' }}
+
+  AZURE_REGISTRY_LOGIN_SERVER: ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER || vars.AZURE_REGISTRY_LOGIN_SERVER || 'acrguestbookdev.azurecr.io' }}
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || vars.RESOURCE_GROUP_NAME || 'rg-guestbook-dev' }}
+  AZURE_LOCATION: ${{ vars.AZURE_LOCATION || vars.LOCATION || 'polandcentral' }}
+
+  AZURE_CONTAINER_APP_NAME: ${{ vars.AZURE_CONTAINER_APP_NAME || 'app-guestbook-dev' }}
+  AZURE_CONTAINER_APP_ENVIRONMENT_NAME: ${{ vars.AZURE_CONTAINER_APP_ENVIRONMENT_NAME || 'cae-guestbook-dev' }}
   AZURE_CONTAINER_APP_TARGET_PORT: ${{ vars.AZURE_CONTAINER_APP_TARGET_PORT || '8080' }}
   AZURE_CONTAINER_APP_INGRESS: ${{ vars.AZURE_CONTAINER_APP_INGRESS || 'external' }}
   AZURE_CONTAINER_APP_MIN_REPLICAS: ${{ vars.AZURE_CONTAINER_APP_MIN_REPLICAS || '0' }}
   AZURE_CONTAINER_APP_MAX_REPLICAS: ${{ vars.AZURE_CONTAINER_APP_MAX_REPLICAS || '1' }}
+
   ASPNETCORE_ENVIRONMENT: ${{ vars.ASPNETCORE_ENVIRONMENT || 'Development' }}
+
+  SQL_SERVER_NAME: ${{ vars.AZURE_SQL_SERVER_NAME || 'sqlserver-guestbook-dev' }}
+  SQL_DATABASE_NAME: ${{ vars.AZURE_SQL_DATABASE_NAME || 'sqldb-guestbook-dev' }}
+  SQL_ADMIN_LOGIN: ${{ vars.AZURE_SQL_ADMIN_LOGIN || 'sqladmin' }}
+  SQL_CONNECTION_STRING_NAME: ${{ vars.AZURE_SQL_CONNECTION_STRING_NAME || 'DefaultConnection' }}
+  SQL_CONNECTION_STRING_SECRET_NAME: ${{ vars.AZURE_SQL_CONNECTION_STRING_SECRET_NAME || 'sql-connection-string' }}
 
 jobs:
   deploy:
@@ -38,7 +48,6 @@ jobs:
       group: app-deploy-dev
       cancel-in-progress: false
 
-    # Run only on successful build, or on manual dispatch.
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.name == 'Build and Push Application')
@@ -65,14 +74,14 @@ jobs:
           echo "uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
           echo "Deploying image: ${IMAGE_URI}"
 
-      - name: Azure Login (OIDC)
+      - name: Azure Login OIDC
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Ensure Container Apps CLI Support
+      - name: Ensure Azure CLI Extensions
         shell: bash
         run: |
           set -euo pipefail
@@ -80,6 +89,8 @@ jobs:
 
       - name: Validate Deployment Configuration
         shell: bash
+        env:
+          SQL_ADMIN_PASSWORD_VALUE: ${{ secrets.SQL_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
 
@@ -91,12 +102,22 @@ jobs:
             AZURE_CONTAINER_APP_NAME \
             AZURE_CONTAINER_APP_ENVIRONMENT_NAME \
             AZURE_CONTAINER_APP_TARGET_PORT \
-            AZURE_CONTAINER_APP_INGRESS; do
+            AZURE_CONTAINER_APP_INGRESS \
+            SQL_SERVER_NAME \
+            SQL_DATABASE_NAME \
+            SQL_ADMIN_LOGIN \
+            SQL_CONNECTION_STRING_NAME \
+            SQL_CONNECTION_STRING_SECRET_NAME; do
             if [ -z "${!variable_name:-}" ]; then
               echo "Missing required configuration: ${variable_name}"
               missing=1
             fi
           done
+
+          if [ -z "${SQL_ADMIN_PASSWORD_VALUE:-}" ]; then
+            echo "Missing required secret: SQL_ADMIN_PASSWORD"
+            missing=1
+          fi
 
           if [ "$missing" -ne 0 ]; then
             echo "Set the missing values as GitHub Environment/Repository variables or secrets."
@@ -109,6 +130,10 @@ jobs:
           echo "Container Apps Environment: ${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}"
           echo "Target port: ${AZURE_CONTAINER_APP_TARGET_PORT}"
           echo "Ingress: ${AZURE_CONTAINER_APP_INGRESS}"
+          echo "SQL server: ${SQL_SERVER_NAME}.database.windows.net"
+          echo "SQL database: ${SQL_DATABASE_NAME}"
+          echo "SQL user: ${SQL_ADMIN_LOGIN}"
+          echo "ConnectionStrings key: ConnectionStrings__${SQL_CONNECTION_STRING_NAME}"
 
       - name: Get ACR Credentials
         id: acr
@@ -138,33 +163,72 @@ jobs:
         run: |
           set -euo pipefail
 
-          if az acr repository show \
+          az acr repository show \
             --name "${{ steps.acr.outputs.name }}" \
             --image "${IMAGE_NAME}:${{ steps.image.outputs.tag }}" \
             --only-show-errors \
-            1>/dev/null; then
-            echo "Image found in ACR: ${IMAGE_NAME}:${{ steps.image.outputs.tag }}"
-          else
-            echo "Image not found in ACR: ${IMAGE_NAME}:${{ steps.image.outputs.tag }}"
-            exit 1
-          fi
+            1>/dev/null
 
-      - name: Create or Update Container App
-        id: deploy
+          echo "Image found in ACR: ${IMAGE_NAME}:${{ steps.image.outputs.tag }}"
+
+      - name: Verify Container Apps Environment Exists
         shell: bash
         run: |
           set -euo pipefail
 
-          IMAGE_URI="${{ steps.image.outputs.uri }}"
-          ENV_VARS=(
-            "ASPNETCORE_URLS=http://+:${AZURE_CONTAINER_APP_TARGET_PORT}"
-            "ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}"
-          )
+          if ! az containerapp env show \
+            --name "${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}" \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --only-show-errors \
+            1>/dev/null; then
+            echo "Container Apps Environment does not exist: ${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}"
+            echo "This workflow creates the Container App, but the Container Apps Environment should be created by infra-apply/Terraform."
+            echo "Run infra-apply first or check that the variable name matches: container_app_environment = ${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}"
+            exit 1
+          fi
+
+          echo "Container Apps Environment exists: ${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}"
+
+      - name: Build SQL Connection String
+        id: sql
+        shell: bash
+        env:
+          SQL_ADMIN_PASSWORD_VALUE: ${{ secrets.SQL_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          CONNECTION_STRING="Server=tcp:${SQL_SERVER_NAME}.database.windows.net,1433;Initial Catalog=${SQL_DATABASE_NAME};Persist Security Info=False;User ID=${SQL_ADMIN_LOGIN};Password=${SQL_ADMIN_PASSWORD_VALUE};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+
+          echo "::add-mask::${SQL_ADMIN_PASSWORD_VALUE}"
+          echo "::add-mask::${CONNECTION_STRING}"
+          echo "secret-name=${SQL_CONNECTION_STRING_SECRET_NAME}" >> "$GITHUB_OUTPUT"
+          echo "env-name=ConnectionStrings__${SQL_CONNECTION_STRING_NAME}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "connection-string<<EOF"
+            echo "$CONNECTION_STRING"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or Update Container App
+        shell: bash
+        env:
+          ACR_USERNAME: ${{ steps.acr.outputs.username }}
+          ACR_PASSWORD: ${{ steps.acr.outputs.password }}
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
+          SQL_CONNECTION_STRING: ${{ steps.sql.outputs.connection-string }}
+          SQL_SECRET_NAME: ${{ steps.sql.outputs.secret-name }}
+          SQL_ENV_NAME: ${{ steps.sql.outputs.env-name }}
+        run: |
+          set -euo pipefail
 
           echo "Container App: ${AZURE_CONTAINER_APP_NAME}"
           echo "Resource Group: ${AZURE_RESOURCE_GROUP}"
           echo "Container Apps Environment: ${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}"
           echo "Image: ${IMAGE_URI}"
+          echo "Target port: ${AZURE_CONTAINER_APP_TARGET_PORT}"
+          echo "SQL env var: ${SQL_ENV_NAME}"
+          echo "SQL secret name: ${SQL_SECRET_NAME}"
 
           if az containerapp show \
             --name "${AZURE_CONTAINER_APP_NAME}" \
@@ -172,26 +236,54 @@ jobs:
             --only-show-errors \
             1>/dev/null 2>/dev/null; then
 
-            echo "Container App exists. Updating image and runtime settings..."
+            echo "Container App exists. Updating image, registry, secret and environment variables..."
 
             az containerapp registry set \
               --name "${AZURE_CONTAINER_APP_NAME}" \
               --resource-group "${AZURE_RESOURCE_GROUP}" \
               --server "${AZURE_REGISTRY_LOGIN_SERVER}" \
-              --username "${{ steps.acr.outputs.username }}" \
-              --password "${{ steps.acr.outputs.password }}" \
+              --username "${ACR_USERNAME}" \
+              --password "${ACR_PASSWORD}" \
+              --only-show-errors
+
+            az containerapp secret set \
+              --name "${AZURE_CONTAINER_APP_NAME}" \
+              --resource-group "${AZURE_RESOURCE_GROUP}" \
+              --secrets "${SQL_SECRET_NAME}=${SQL_CONNECTION_STRING}" \
               --only-show-errors
 
             az containerapp update \
               --name "${AZURE_CONTAINER_APP_NAME}" \
               --resource-group "${AZURE_RESOURCE_GROUP}" \
               --image "${IMAGE_URI}" \
+              --set-env-vars \
+                "ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}" \
+                "ASPNETCORE_HTTP_PORTS=${AZURE_CONTAINER_APP_TARGET_PORT}" \
+                "${SQL_ENV_NAME}=secretref:${SQL_SECRET_NAME}" \
               --min-replicas "${AZURE_CONTAINER_APP_MIN_REPLICAS}" \
               --max-replicas "${AZURE_CONTAINER_APP_MAX_REPLICAS}" \
-              --set-env-vars "${ENV_VARS[@]}" \
               --only-show-errors
 
-            echo "operation=update" >> "$GITHUB_OUTPUT"
+            if az containerapp ingress show \
+              --name "${AZURE_CONTAINER_APP_NAME}" \
+              --resource-group "${AZURE_RESOURCE_GROUP}" \
+              --only-show-errors \
+              1>/dev/null 2>/dev/null; then
+              az containerapp ingress update \
+                --name "${AZURE_CONTAINER_APP_NAME}" \
+                --resource-group "${AZURE_RESOURCE_GROUP}" \
+                --type "${AZURE_CONTAINER_APP_INGRESS}" \
+                --target-port "${AZURE_CONTAINER_APP_TARGET_PORT}" \
+                --only-show-errors
+            else
+              az containerapp ingress enable \
+                --name "${AZURE_CONTAINER_APP_NAME}" \
+                --resource-group "${AZURE_RESOURCE_GROUP}" \
+                --type "${AZURE_CONTAINER_APP_INGRESS}" \
+                --target-port "${AZURE_CONTAINER_APP_TARGET_PORT}" \
+                --only-show-errors
+            fi
+
           else
             echo "Container App does not exist. Creating it now..."
 
@@ -201,104 +293,45 @@ jobs:
               --environment "${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}" \
               --image "${IMAGE_URI}" \
               --registry-server "${AZURE_REGISTRY_LOGIN_SERVER}" \
-              --registry-username "${{ steps.acr.outputs.username }}" \
-              --registry-password "${{ steps.acr.outputs.password }}" \
+              --registry-username "${ACR_USERNAME}" \
+              --registry-password "${ACR_PASSWORD}" \
               --ingress "${AZURE_CONTAINER_APP_INGRESS}" \
               --target-port "${AZURE_CONTAINER_APP_TARGET_PORT}" \
               --min-replicas "${AZURE_CONTAINER_APP_MIN_REPLICAS}" \
               --max-replicas "${AZURE_CONTAINER_APP_MAX_REPLICAS}" \
-              --env-vars "${ENV_VARS[@]}" \
+              --secrets "${SQL_SECRET_NAME}=${SQL_CONNECTION_STRING}" \
+              --env-vars \
+                "ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}" \
+                "ASPNETCORE_HTTP_PORTS=${AZURE_CONTAINER_APP_TARGET_PORT}" \
+                "${SQL_ENV_NAME}=secretref:${SQL_SECRET_NAME}" \
               --only-show-errors
-
-            echo "operation=create" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Output Deployment Details
+        shell: bash
+        run: |
+          set -euo pipefail
 
           FQDN=$(az containerapp show \
             --name "${AZURE_CONTAINER_APP_NAME}" \
             --resource-group "${AZURE_RESOURCE_GROUP}" \
             --query "properties.configuration.ingress.fqdn" \
-            -o tsv 2>/dev/null || true)
+            -o tsv)
 
-          echo "fqdn=${FQDN}" >> "$GITHUB_OUTPUT"
+          echo "## Application Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Container App: ${AZURE_CONTAINER_APP_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Resource Group: ${AZURE_RESOURCE_GROUP}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Container Apps Environment: ${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image: ${{ steps.image.outputs.uri }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Target port: ${AZURE_CONTAINER_APP_TARGET_PORT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SQL Server: ${SQL_SERVER_NAME}.database.windows.net" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SQL Database: ${SQL_DATABASE_NAME}" >> "$GITHUB_STEP_SUMMARY"
 
           if [ -n "$FQDN" ]; then
-            echo "Container App URL: https://${FQDN}"
+            echo "- URL: https://${FQDN}" >> "$GITHUB_STEP_SUMMARY"
+            echo "Application URL: https://${FQDN}"
           else
-            echo "No public FQDN returned. This is expected when ingress is disabled or internal-only."
-          fi
-
-      - name: Show Active Revisions
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          az containerapp revision list \
-            --name "${AZURE_CONTAINER_APP_NAME}" \
-            --resource-group "${AZURE_RESOURCE_GROUP}" \
-            --query "[?properties.active==\`true\`].{Name:name,RunningState:properties.runningState,TrafficWeight:properties.trafficWeight}" \
-            -o table \
-            || true
-
-      - name: Run Smoke Test
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          CONTAINER_APP_FQDN="${{ steps.deploy.outputs.fqdn }}"
-
-          if [ -z "$CONTAINER_APP_FQDN" ]; then
-            echo "Smoke test skipped because the Container App does not expose a public FQDN."
-            exit 0
-          fi
-
-          MAX_ATTEMPTS=12
-          RETRY_DELAY=10
-          ATTEMPT=0
-
-          echo "Running smoke tests against: https://${CONTAINER_APP_FQDN}"
-
-          while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
-            ATTEMPT=$((ATTEMPT + 1))
-            echo "Smoke test attempt ${ATTEMPT}/${MAX_ATTEMPTS}..."
-
-            if curl -sf "https://${CONTAINER_APP_FQDN}/health" > /dev/null 2>&1; then
-              echo "Health endpoint returned success."
-              exit 0
-            fi
-
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${CONTAINER_APP_FQDN}/" || true)
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "Root endpoint returned 200."
-              exit 0
-            fi
-
-            if [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; then
-              echo "Application not ready yet. Retrying in ${RETRY_DELAY}s..."
-              sleep "$RETRY_DELAY"
-            fi
-          done
-
-          echo "Smoke test did not confirm readiness, but deployment step completed. Check Container App logs if needed."
-          exit 0
-
-      - name: Deployment Summary
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "## Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Environment**: dev" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Operation**: ${{ steps.deploy.outputs.operation }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Image Tag**: ${{ steps.image.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Image URI**: ${{ steps.image.outputs.uri }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Container App**: ${AZURE_CONTAINER_APP_NAME}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Container Apps Environment**: ${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Target Port**: ${AZURE_CONTAINER_APP_TARGET_PORT}" >> "$GITHUB_STEP_SUMMARY"
-
-          if [ -n "${{ steps.deploy.outputs.fqdn }}" ]; then
-            echo "- **URL**: https://${{ steps.deploy.outputs.fqdn }}" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "- **URL**: not exposed publicly" >> "$GITHUB_STEP_SUMMARY"
+            echo "- URL: not available" >> "$GITHUB_STEP_SUMMARY"
+            echo "Application URL not available. Check ingress configuration."
           fi
