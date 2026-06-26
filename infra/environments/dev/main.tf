@@ -76,7 +76,7 @@ module "key_vault" {
   key_vault_admin_principal_ids = var.key_vault_admin_principal_ids
 }
 
-module "container_app" {
+module "container_app_environment" {
   source = "../../modules/container-app-environment"
 
   container_app_environment = var.container_app_environment
