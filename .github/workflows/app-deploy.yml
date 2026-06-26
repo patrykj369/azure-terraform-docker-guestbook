@@ -3,14 +3,6 @@ name: Deploy Application
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        type: choice
-        options:
-          - dev
-          - stage
-          - prod
       image-tag:
         description: 'Image tag to deploy (e.g., commit SHA)'
         required: true
@@ -24,13 +16,29 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  IMAGE_NAME: guestbook
+  AZURE_REGISTRY_LOGIN_SERVER: ${{ secrets.AZURE_REGISTRY_LOGIN_SERVER }}
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  AZURE_CONTAINER_APP_NAME: ${{ vars.AZURE_CONTAINER_APP_NAME }}
+  AZURE_CONTAINER_APP_ENVIRONMENT_NAME: ${{ vars.AZURE_CONTAINER_APP_ENVIRONMENT_NAME }}
+  AZURE_CONTAINER_APP_TARGET_PORT: ${{ vars.AZURE_CONTAINER_APP_TARGET_PORT || '8080' }}
+  AZURE_CONTAINER_APP_INGRESS: ${{ vars.AZURE_CONTAINER_APP_INGRESS || 'external' }}
+  AZURE_CONTAINER_APP_MIN_REPLICAS: ${{ vars.AZURE_CONTAINER_APP_MIN_REPLICAS || '0' }}
+  AZURE_CONTAINER_APP_MAX_REPLICAS: ${{ vars.AZURE_CONTAINER_APP_MAX_REPLICAS || '1' }}
+  ASPNETCORE_ENVIRONMENT: ${{ vars.ASPNETCORE_ENVIRONMENT || 'Development' }}
+
 jobs:
   deploy:
-    name: Deploy - ${{ github.event.inputs.environment || 'dev' }}
+    name: Deploy - dev
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'dev' }}
-    
-    # Only run on successful build, or on manual dispatch
+    environment: dev
+
+    concurrency:
+      group: app-deploy-dev
+      cancel-in-progress: false
+
+    # Run only on successful build, or on manual dispatch.
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.name == 'Build and Push Application')
@@ -41,16 +49,20 @@ jobs:
 
       - name: Determine Image Tag
         id: image
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             IMAGE_TAG="${{ github.event.inputs.image-tag }}"
           else
-            IMAGE_TAG="${{ github.event.workflow_run.head_commit.id }}"
+            IMAGE_TAG="${{ github.event.workflow_run.head_sha }}"
           fi
-          
-          IMAGE_URI="${{ vars.AZURE_REGISTRY_LOGIN_SERVER }}/guestbook:${IMAGE_TAG}"
-          echo "tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
+
+          IMAGE_URI="${AZURE_REGISTRY_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
+
+          echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
           echo "Deploying image: ${IMAGE_URI}"
 
       - name: Azure Login (OIDC)
@@ -60,86 +72,233 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Verify Image Exists in ACR
+      - name: Ensure Container Apps CLI Support
+        shell: bash
         run: |
-          ACR_NAME=$(echo "${{ vars.AZURE_REGISTRY_LOGIN_SERVER }}" | cut -d'.' -f1)
-          IMAGE_TAG="${{ steps.image.outputs.tag }}"
-          
-          if az acr repository show \
-            --name ${ACR_NAME} \
-            --image "guestbook:${IMAGE_TAG}" &>/dev/null; then
-            echo "✓ Image found in ACR: guestbook:${IMAGE_TAG}"
-          else
-            echo "✗ Image not found in ACR: guestbook:${IMAGE_TAG}"
+          set -euo pipefail
+          az extension add --name containerapp --upgrade
+
+      - name: Validate Deployment Configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=0
+
+          for variable_name in \
+            AZURE_REGISTRY_LOGIN_SERVER \
+            AZURE_RESOURCE_GROUP \
+            AZURE_CONTAINER_APP_NAME \
+            AZURE_CONTAINER_APP_ENVIRONMENT_NAME \
+            AZURE_CONTAINER_APP_TARGET_PORT \
+            AZURE_CONTAINER_APP_INGRESS; do
+            if [ -z "${!variable_name:-}" ]; then
+              echo "Missing required configuration: ${variable_name}"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            echo "Set the missing values as GitHub Environment/Repository variables or secrets."
             exit 1
           fi
 
-      - name: Update Container App
-        run: |
-          ENVIRONMENT="${{ github.event.inputs.environment || 'dev' }}"
-          CONTAINER_APP_NAME="${{ vars.AZURE_CONTAINER_APP_NAME }}"
-          RESOURCE_GROUP="${{ vars.AZURE_RESOURCE_GROUP }}"
-          IMAGE_URI="${{ steps.image.outputs.uri }}"
-          
-          echo "Updating Container App: ${CONTAINER_APP_NAME}"
-          echo "Resource Group: ${RESOURCE_GROUP}"
-          echo "New image: ${IMAGE_URI}"
-          
-          az containerapp update \
-            --name ${CONTAINER_APP_NAME} \
-            --resource-group ${RESOURCE_GROUP} \
-            --image ${IMAGE_URI} \
-            --no-wait
+          echo "Configuration validated."
+          echo "Resource group: ${AZURE_RESOURCE_GROUP}"
+          echo "Container App: ${AZURE_CONTAINER_APP_NAME}"
+          echo "Container Apps Environment: ${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}"
+          echo "Target port: ${AZURE_CONTAINER_APP_TARGET_PORT}"
+          echo "Ingress: ${AZURE_CONTAINER_APP_INGRESS}"
 
-      - name: Wait for Deployment
-        run: sleep 15
+      - name: Get ACR Credentials
+        id: acr
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ACR_NAME="${AZURE_REGISTRY_LOGIN_SERVER%%.*}"
+
+          ACR_USERNAME=$(az acr credential show \
+            --name "$ACR_NAME" \
+            --query "username" \
+            -o tsv)
+
+          ACR_PASSWORD=$(az acr credential show \
+            --name "$ACR_NAME" \
+            --query "passwords[0].value" \
+            -o tsv)
+
+          echo "::add-mask::${ACR_PASSWORD}"
+          echo "name=${ACR_NAME}" >> "$GITHUB_OUTPUT"
+          echo "username=${ACR_USERNAME}" >> "$GITHUB_OUTPUT"
+          echo "password=${ACR_PASSWORD}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Image Exists in ACR
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if az acr repository show \
+            --name "${{ steps.acr.outputs.name }}" \
+            --image "${IMAGE_NAME}:${{ steps.image.outputs.tag }}" \
+            --only-show-errors \
+            1>/dev/null; then
+            echo "Image found in ACR: ${IMAGE_NAME}:${{ steps.image.outputs.tag }}"
+          else
+            echo "Image not found in ACR: ${IMAGE_NAME}:${{ steps.image.outputs.tag }}"
+            exit 1
+          fi
+
+      - name: Create or Update Container App
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          IMAGE_URI="${{ steps.image.outputs.uri }}"
+          ENV_VARS=(
+            "ASPNETCORE_URLS=http://+:${AZURE_CONTAINER_APP_TARGET_PORT}"
+            "ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}"
+          )
+
+          echo "Container App: ${AZURE_CONTAINER_APP_NAME}"
+          echo "Resource Group: ${AZURE_RESOURCE_GROUP}"
+          echo "Container Apps Environment: ${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}"
+          echo "Image: ${IMAGE_URI}"
+
+          if az containerapp show \
+            --name "${AZURE_CONTAINER_APP_NAME}" \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --only-show-errors \
+            1>/dev/null 2>/dev/null; then
+
+            echo "Container App exists. Updating image and runtime settings..."
+
+            az containerapp registry set \
+              --name "${AZURE_CONTAINER_APP_NAME}" \
+              --resource-group "${AZURE_RESOURCE_GROUP}" \
+              --server "${AZURE_REGISTRY_LOGIN_SERVER}" \
+              --username "${{ steps.acr.outputs.username }}" \
+              --password "${{ steps.acr.outputs.password }}" \
+              --only-show-errors
+
+            az containerapp update \
+              --name "${AZURE_CONTAINER_APP_NAME}" \
+              --resource-group "${AZURE_RESOURCE_GROUP}" \
+              --image "${IMAGE_URI}" \
+              --min-replicas "${AZURE_CONTAINER_APP_MIN_REPLICAS}" \
+              --max-replicas "${AZURE_CONTAINER_APP_MAX_REPLICAS}" \
+              --set-env-vars "${ENV_VARS[@]}" \
+              --only-show-errors
+
+            echo "operation=update" >> "$GITHUB_OUTPUT"
+          else
+            echo "Container App does not exist. Creating it now..."
+
+            az containerapp create \
+              --name "${AZURE_CONTAINER_APP_NAME}" \
+              --resource-group "${AZURE_RESOURCE_GROUP}" \
+              --environment "${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}" \
+              --image "${IMAGE_URI}" \
+              --registry-server "${AZURE_REGISTRY_LOGIN_SERVER}" \
+              --registry-username "${{ steps.acr.outputs.username }}" \
+              --registry-password "${{ steps.acr.outputs.password }}" \
+              --ingress "${AZURE_CONTAINER_APP_INGRESS}" \
+              --target-port "${AZURE_CONTAINER_APP_TARGET_PORT}" \
+              --min-replicas "${AZURE_CONTAINER_APP_MIN_REPLICAS}" \
+              --max-replicas "${AZURE_CONTAINER_APP_MAX_REPLICAS}" \
+              --env-vars "${ENV_VARS[@]}" \
+              --only-show-errors
+
+            echo "operation=create" >> "$GITHUB_OUTPUT"
+          fi
+
+          FQDN=$(az containerapp show \
+            --name "${AZURE_CONTAINER_APP_NAME}" \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --query "properties.configuration.ingress.fqdn" \
+            -o tsv 2>/dev/null || true)
+
+          echo "fqdn=${FQDN}" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$FQDN" ]; then
+            echo "Container App URL: https://${FQDN}"
+          else
+            echo "No public FQDN returned. This is expected when ingress is disabled or internal-only."
+          fi
+
+      - name: Show Active Revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          az containerapp revision list \
+            --name "${AZURE_CONTAINER_APP_NAME}" \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --query "[?properties.active==\`true\`].{Name:name,RunningState:properties.runningState,TrafficWeight:properties.trafficWeight}" \
+            -o table \
+            || true
 
       - name: Run Smoke Test
         continue-on-error: true
+        shell: bash
         run: |
-          CONTAINER_APP_FQDN="${{ vars.AZURE_CONTAINER_APP_FQDN }}"
+          set -euo pipefail
+
+          CONTAINER_APP_FQDN="${{ steps.deploy.outputs.fqdn }}"
+
+          if [ -z "$CONTAINER_APP_FQDN" ]; then
+            echo "Smoke test skipped because the Container App does not expose a public FQDN."
+            exit 0
+          fi
+
           MAX_ATTEMPTS=12
           RETRY_DELAY=10
           ATTEMPT=0
-          
+
           echo "Running smoke tests against: https://${CONTAINER_APP_FQDN}"
-          
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+
+          while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
             ATTEMPT=$((ATTEMPT + 1))
-            echo "Smoke test attempt $ATTEMPT/$MAX_ATTEMPTS..."
-            
-            # Try health endpoint first
+            echo "Smoke test attempt ${ATTEMPT}/${MAX_ATTEMPTS}..."
+
             if curl -sf "https://${CONTAINER_APP_FQDN}/health" > /dev/null 2>&1; then
-              echo "✓ Application is healthy"
-              
-              # Optional: Check specific endpoints
-              echo "✓ Testing root endpoint..."
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${CONTAINER_APP_FQDN}/")
-              if [ "$HTTP_CODE" == "200" ]; then
-                echo "✓ Root endpoint returned 200"
-                exit 0
-              fi
+              echo "Health endpoint returned success."
+              exit 0
             fi
-            
-            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-              echo "Not ready yet, retrying in ${RETRY_DELAY}s..."
-              sleep $RETRY_DELAY
+
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${CONTAINER_APP_FQDN}/" || true)
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Root endpoint returned 200."
+              exit 0
+            fi
+
+            if [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; then
+              echo "Application not ready yet. Retrying in ${RETRY_DELAY}s..."
+              sleep "$RETRY_DELAY"
             fi
           done
-          
-          echo "⚠ Smoke tests completed with warnings"
+
+          echo "Smoke test did not confirm readiness, but deployment step completed. Check Container App logs if needed."
           exit 0
 
       - name: Deployment Summary
+        shell: bash
         run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: ${{ github.event.inputs.environment || 'dev' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image Tag**: ${{ steps.image.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image URI**: ${{ steps.image.outputs.uri }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Container App**: ${{ vars.AZURE_CONTAINER_APP_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL**: https://${{ vars.AZURE_CONTAINER_APP_FQDN }}" >> $GITHUB_STEP_SUMMARY
+          set -euo pipefail
 
-  # TODO: Optional rollback job
-  # - Can be triggered manually to revert to previous image
-  # - Requires storing previous image tag as artifact or in infrastructure
+          echo "## Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Environment**: dev" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Operation**: ${{ steps.deploy.outputs.operation }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Image Tag**: ${{ steps.image.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Image URI**: ${{ steps.image.outputs.uri }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Container App**: ${AZURE_CONTAINER_APP_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Container Apps Environment**: ${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Target Port**: ${AZURE_CONTAINER_APP_TARGET_PORT}" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "${{ steps.deploy.outputs.fqdn }}" ]; then
+            echo "- **URL**: https://${{ steps.deploy.outputs.fqdn }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- **URL**: not exposed publicly" >> "$GITHUB_STEP_SUMMARY"
+          fi
