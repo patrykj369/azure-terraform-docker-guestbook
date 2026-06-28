@@ -1,13 +1,14 @@
 name: Build and Push Application
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'src/**'
-      - 'Dockerfile'
-      - '.github/workflows/app-build.yml'
-  workflow_dispatch:
+  workflow_call:
+    outputs:
+      image-uri:
+        description: 'Full image URI'
+        value: ${{ jobs.build-and-push.outputs.image-uri }}
+      image-tag:
+        description: 'Image tag'
+        value: ${{ jobs.build-and-push.outputs.image-tag }}
 
 permissions:
   id-token: write
@@ -23,8 +24,8 @@ jobs:
     environment: dev
 
     outputs:
-      image-uri: ${{ steps.build.outputs.image-uri }}
-      image-tag: ${{ steps.build.outputs.image-tag }}
+      image-uri: ${{ steps.output.outputs.image-uri }}
+      image-tag: ${{ steps.output.outputs.image-tag }}
 
     steps:
       - name: Checkout code
@@ -85,15 +86,12 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Output Build Results
+        id: output
         run: |
           IMAGE_URI="${{ steps.acr.outputs.url }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.tag }}"
+
           echo "Image built and pushed: ${IMAGE_URI}"
           echo "Image digest: ${{ steps.build.outputs.digest }}"
-          echo "::set-output name=image-uri::${IMAGE_URI}"
-          echo "::set-output name=image-tag::${{ steps.tags.outputs.tag }}"
 
-  # TODO: Run integration tests if applicable
-  # - Build application with test dependencies
-  # - Run unit tests
-  # - Run integration tests against test database
-  # Only push to ACR if tests pass
+          echo "image-uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+          echo "image-tag=${{ steps.tags.outputs.tag }}" >> "$GITHUB_OUTPUT"

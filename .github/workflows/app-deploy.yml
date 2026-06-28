@@ -1,16 +1,13 @@
 name: Deploy Application
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       image-tag:
         description: 'Image tag to deploy, e.g. commit SHA'
         required: true
         type: string
-  workflow_run:
-    workflows: ["Build and Push Application"]
-    types: [completed]
-    branches: [main]
+
 
 permissions:
   id-token: write
@@ -44,14 +41,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
 
-    concurrency:
-      group: app-deploy-dev
-      cancel-in-progress: false
-
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.name == 'Build and Push Application')
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -62,12 +51,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            IMAGE_TAG="${{ github.event.inputs.image-tag }}"
-          else
-            IMAGE_TAG="${{ github.event.workflow_run.head_sha }}"
-          fi
-
+          IMAGE_TAG="${{ inputs.image-tag }}"
           IMAGE_URI="${AZURE_REGISTRY_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
 
           echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"

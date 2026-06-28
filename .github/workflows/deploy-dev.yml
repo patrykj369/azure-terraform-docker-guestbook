@@ -1,0 +1,34 @@
+name: Deploy Development Environment
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  infra-plan:
+    name: Terraform Plan
+    uses: ./.github/workflows/infra-plan.yml
+
+  infra-apply:
+    needs: infra-plan
+    name: Terraform Apply
+    uses: ./.github/workflows/infra-apply.yml
+    
+  app-build:
+    needs:
+      - infra-plan
+      - infra-apply
+    name: Build and Push Application
+    uses: ./.github/workflows/app-build.yml
+
+  app-deploy:
+    needs: app-build
+    name: Deploy Application
+    uses: ./.github/workflows/app-deploy.yml
+    with:
+      image-tag: ${{ needs.app-build.outputs.image-tag }}
