@@ -8,8 +8,6 @@ resource "azurerm_container_registry" "main" {
   tags = var.common_tags
 }
 
-# Grant AcrPull role to application managed identity
-# This allows the application to pull images from the registry
 resource "azurerm_role_assignment" "app_acr_pull" {
   scope                = azurerm_container_registry.main.id
   role_definition_name = "AcrPull"

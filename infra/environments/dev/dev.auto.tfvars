@@ -10,9 +10,5 @@ key_vault_name          = "kv-guestbook-dev"
 key_vault_admin_principal_ids = [
   "e3037748-4f2a-439e-bc52-b9eeb84968e4"
 ]
-container_app_name           = "app-guestbook-dev"
-container_app_environment    = "cae-guestbook-dev"
-image_name                   = "guestbook"
-image_tag                    = "latest"
 log_analytics_workspace_name = "law-guestbook-dev"
 log_analytics_sku            = "PerGB2018"
