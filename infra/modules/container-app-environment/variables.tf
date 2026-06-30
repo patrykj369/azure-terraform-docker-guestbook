@@ -13,6 +13,11 @@ variable "location" {
   type        = string
 }
 
+variable "infrastructure_subnet_id" {
+  description = "ID of the subnet for the container app environment"
+  type        = string
+}
+
 variable "common_tags" {
   description = "Common tags to apply to all resources"
   type        = map(string)

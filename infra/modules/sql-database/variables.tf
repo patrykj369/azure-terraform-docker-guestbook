@@ -36,6 +36,12 @@ variable "sku_name" {
   default     = "Basic"
 }
 
+variable "public_network_access_enabled" {
+  description = "Enable or disable public network access to the SQL Server"
+  type        = bool
+  default     = false
+}
+
 variable "environment" {
   description = "Environment name"
   type        = string
