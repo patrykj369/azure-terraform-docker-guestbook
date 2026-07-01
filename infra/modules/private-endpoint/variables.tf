@@ -23,7 +23,7 @@ variable "private_service_connection" {
   type = object({
     name                           = string
     private_connection_resource_id = string
-    is_manual_connection          = bool
+    is_manual_connection           = bool
     subresource_names              = optional(list(string), [])
   })
 }
@@ -33,7 +33,7 @@ variable "private_dns_zone_group" {
   type = object({
     name = string
     private_dns_zone_configs = list(object({
-      name                = string
+      name                 = string
       private_dns_zone_ids = list(string)
     }))
   })
