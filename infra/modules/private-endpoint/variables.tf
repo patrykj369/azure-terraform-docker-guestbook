@@ -31,10 +31,7 @@ variable "private_service_connection" {
 variable "private_dns_zone_group" {
   description = "The private DNS zone group configuration for the private endpoint."
   type = object({
-    name = string
-    private_dns_zone_configs = list(object({
-      name                 = string
-      private_dns_zone_ids = list(string)
-    }))
+    name                 = string
+    private_dns_zone_ids = list(string)
   })
 }

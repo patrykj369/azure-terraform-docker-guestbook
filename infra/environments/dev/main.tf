@@ -103,6 +103,9 @@ module "private_endpoint_sql" {
     private_dns_zone_ids = [module.private_dns_zone_sql.id]
   }
 
+  depends_on = [
+    module.private_dns_zone_sql_link
+  ]
 
 }
 
