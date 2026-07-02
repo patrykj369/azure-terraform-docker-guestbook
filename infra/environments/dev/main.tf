@@ -75,7 +75,7 @@ module "private_dns_zone_sql" {
 }
 
 module "private_dns_zone_sql_link" {
-  source = "../../modules/private-dns-zone-link"
+  source = "../../modules/private-dns-zone-virtual-network-link"
 
   name                  = "link-${local.project}-${local.environment}-sql"
   resource_group_name   = module.resource_group.name
