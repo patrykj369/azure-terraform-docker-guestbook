@@ -5,5 +5,5 @@ output "environment_id" {
 
 output "infrastructure_subnet_id" {
   description = "ID of the subnet used for the container app environment"
-  value = var.infrastructure_subnet_id
+  value       = var.infrastructure_subnet_id
 }

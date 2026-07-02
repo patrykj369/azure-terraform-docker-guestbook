@@ -102,7 +102,7 @@ module "private_endpoint_sql" {
     name                 = "pdzconfig-${local.project}-${local.environment}-sql"
     private_dns_zone_ids = [module.private_dns_zone_sql.id]
   }
-  
+
 
 }
 
