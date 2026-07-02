@@ -1,9 +1,9 @@
 output "environment_id" {
   description = "ID of the container app environment"
-  value       = azurerm_container_app_environment.main.id
+  value       = var.container_app_environment_name
 }
 
 output "infrastructure_subnet_id" {
   description = "ID of the subnet used for the container app environment"
-  value       = azurerm_subnet.main.id
+  value = var.infrastructure_subnet_id
 }

@@ -98,12 +98,11 @@ module "private_endpoint_sql" {
     subresource_names              = ["sqlServer"]
   }
 
-  private_dns_zone_group = [
-    {
-      name                 = "pdzconfig-${local.project}-${local.environment}-sql"
-      private_dns_zone_ids = [module.private_dns_zone_sql.id]
-    }
-  ]
+  private_dns_zone_group = {
+    name                 = "pdzconfig-${local.project}-${local.environment}-sql"
+    private_dns_zone_ids = [module.private_dns_zone_sql.id]
+  }
+  
 
 }
 
