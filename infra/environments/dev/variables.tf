@@ -10,6 +10,18 @@ variable "resource_group_name" {
   default     = "rg-guestbook-dev"
 }
 
+variable "virtual_network_name" {
+  description = "Name of the Azure virtual network"
+  type        = string
+  default     = "vnet-guestbook-dev"
+}
+
+variable "virtual_network_address_space" {
+  description = "Address space for the Azure virtual network"
+  type        = list(string)
+  default     = ["10.0.0.0/16"]
+}
+
 # Container Registry Variables
 variable "container_registry_name" {
   description = "Name of the Azure Container Registry"
@@ -46,6 +58,12 @@ variable "sql_admin_password" {
   description = "SQL Server administrator password"
   type        = string
   sensitive   = true
+}
+
+variable "sql_public_network_access_enabled" {
+  description = "Enable or disable public network access to the SQL Server"
+  type        = bool
+  default     = false
 }
 
 variable "sql_sku_name" {
