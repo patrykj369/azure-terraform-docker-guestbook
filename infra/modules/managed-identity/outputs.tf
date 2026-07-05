@@ -3,6 +3,11 @@ output "id" {
   value       = azurerm_user_assigned_identity.main.id
 }
 
+output "name" {
+  description = "Name of the managed identity"
+  value       = azurerm_user_assigned_identity.main.name
+}
+
 output "principal_id" {
   description = "Principal ID of the managed identity"
   value       = azurerm_user_assigned_identity.main.principal_id

@@ -11,6 +11,8 @@ locals {
   }
 }
 
+data "azurerm_client_config" "current" {}
+
 module "resource_group" {
   source = "../../modules/resource-group"
 
@@ -176,4 +178,4 @@ module "monitoring" {
   common_tags         = local.common_tags
 }
 
-data "azurerm_client_config" "current" {}
+
