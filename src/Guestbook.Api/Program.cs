@@ -192,8 +192,8 @@ string GenerateHtml(List<Guest> guests)
 
     <div class=""guests-container"">
         <h2>Wpisy gości ({guests.Count})</h2>
-        {(guests.Count == 0 ? 
-            "<div class=\"no-guests\">Brak wpisów. Bądź pierwszy!</div>" : 
+        {(guests.Count == 0 ?
+            "<div class=\"no-guests\">Brak wpisów. Bądź pierwszy!</div>" :
             $@"<table>
                 <thead>
                     <tr>
