@@ -11,7 +11,13 @@ permissions:
   pull-requests: write
 
 jobs:
+  code-tests:
+    name: Code Quality and Security Tests
+    uses: ./.github/workflows/code-tests.yml
+    secrets: inherit
+
   infra-plan:
+    needs: code-tests
     name: Terraform Plan
     uses: ./.github/workflows/infra-plan.yml
     secrets: inherit
