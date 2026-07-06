@@ -13,28 +13,32 @@ jobs:
     name: .NET checks
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+       working-directory: src
+
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 9.0.x
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
 
-      - name: Restore
-        run: dotnet restore
+    - name: Restore
+      run: dotnet restore GuestBook.csproj
 
-      - name: Build
-        run: dotnet build --configuration Release --no-restore
+    - name: Build
+      run: dotnet build GuestBook.csproj --configuration Release --no-restore
 
-      - name: Test
-        run: dotnet test --configuration Release --no-build
+    - name: Test
+      run: dotnet test GuestBook.csproj --configuration Release --no-build
 
-      - name: Check formatting
-        run: dotnet format --verify-no-changes
+    - name: Check formatting
+      run: dotnet format GuestBook.csproj --verify-no-changes
 
-      - name: Check vulnerable NuGet packages
-        run: dotnet list package --vulnerable --include-transitive
+    - name: Check vulnerable NuGet packages
+      run: dotnet list GuestBook.csproj package --vulnerable --include-transitive
 
   docker:
     name: Docker checks
