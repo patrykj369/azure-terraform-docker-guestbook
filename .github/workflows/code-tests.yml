@@ -15,7 +15,7 @@ jobs:
 
     defaults:
       run:
-       working-directory: ./src/GuestBook.Api
+       working-directory: ./src/Guestbook.Api
 
     steps:
     - uses: actions/checkout@v4
