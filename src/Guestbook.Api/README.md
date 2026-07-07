@@ -1,6 +1,6 @@
 # Guestbook - Aplikacja ASP.NET Core
 
-Prosta aplikacja ASP.NET Core 9.0 - wirtualna księga gości z bazą danych SQL Server.
+Prosta aplikacja ASP.NET Core 10.0 - wirtualna księga gości z bazą danych SQL Server.
 
 ## ⚡ Szybki start (5 minut)
 
@@ -62,7 +62,7 @@ Edytuj plik `appsettings.json`:
 
 ## 📋 Wymagania
 
-- .NET 9.0 Runtime (lub SDK)
+- .NET 10.0 Runtime (lub SDK)
 - SQL Server 2016 SP2+
 - IIS 7.5+ (do wdrażania)
 
