@@ -12,6 +12,7 @@ jobs:
   terraform-plan:
     name: Terraform Plan - dev
     runs-on: ubuntu-latest
+    environment: dev
 
     env:
       ARM_USE_OIDC: true
