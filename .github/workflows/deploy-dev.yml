@@ -22,16 +22,23 @@ jobs:
     uses: ./.github/workflows/infra-plan.yml
     secrets: inherit
 
-  infra-apply:
+  approve-dev:
     needs: infra-plan
+    name: Approve Dev Deployment
+    runs-on: ubuntu-latest
+    environment: dev-approval
+    steps:
+      - name: approval
+        run: echo "Dev deployment approved. Continuing with infra apply, build and deploy."
+
+  infra-apply:
+    needs: approve-dev
     name: Terraform Apply
     uses: ./.github/workflows/infra-apply.yml
     secrets: inherit
     
   app-build:
-    needs:
-      - infra-plan
-      - infra-apply
+    needs: infra-apply
     name: Build and Push Application
     uses: ./.github/workflows/app-build.yml
     secrets: inherit
