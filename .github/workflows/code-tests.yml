@@ -54,7 +54,7 @@ jobs:
           dockerfile: Dockerfile
 
       - name: Build Docker image
-        run: docker build -t guestbook-image:${{ github.sha }} .
+        run: docker build --pull -t guestbook-image:${{ github.sha }} .
 
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@master
