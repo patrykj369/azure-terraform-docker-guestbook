@@ -7,6 +7,8 @@ permissions:
   id-token: write
   contents: read
   pull-requests: write
+  actions: read
+  security-events: write
 
 jobs:
   dotnet:
@@ -43,11 +45,6 @@ jobs:
   semgrep-sast:
     name: Semgrep SAST
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      actions: read
-      security-events: write
 
     steps:
       - uses: actions/checkout@v4
