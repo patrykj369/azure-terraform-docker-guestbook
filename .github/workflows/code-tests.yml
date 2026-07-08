@@ -40,10 +40,393 @@ jobs:
     - name: Check vulnerable NuGet packages
       run: dotnet list GuestBook.csproj package --vulnerable --include-transitive
 
+  semgrep-sast:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep SAST
+        id: semgrep
+        shell: bash
+        run: |
+          mkdir -p semgrep-report
+
+          set +e
+
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/src" \
+            -w /src \
+            semgrep/semgrep:latest \
+            semgrep scan \
+              --config p/default \
+              --metrics=off \
+              --error \
+              --text \
+              --output semgrep-report/semgrep.txt \
+              --json-output semgrep-report/semgrep.json \
+              --sarif-output semgrep-report/semgrep.sarif
+
+          SEMGREP_EXIT_CODE=$?
+
+          echo "exit_code=${SEMGREP_EXIT_CODE}" >> "$GITHUB_OUTPUT"
+
+          if [ ! -f semgrep-report/semgrep.json ]; then
+            echo '{"results":[],"errors":[{"message":"Semgrep did not generate JSON output."}]}' > semgrep-report/semgrep.json
+          fi
+
+          if [ ! -f semgrep-report/semgrep.txt ]; then
+            echo "Semgrep did not generate text output." > semgrep-report/semgrep.txt
+          fi
+
+          exit 0
+
+      - name: Convert Semgrep JSON to HTML
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          from html import escape
+          from collections import Counter
+
+          input_file = "semgrep-report/semgrep.json"
+          output_file = "semgrep-report/index.html"
+
+          with open(input_file, "r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          results = data.get("results", [])
+          errors = data.get("errors", [])
+
+          repo = os.getenv("GITHUB_REPOSITORY", "")
+          server = os.getenv("GITHUB_SERVER_URL", "https://github.com")
+          sha = os.getenv("GITHUB_SHA", "")
+          run_id = os.getenv("GITHUB_RUN_ID", "")
+
+          def severity_of(result):
+              extra = result.get("extra", {})
+              return str(extra.get("severity", "INFO")).upper()
+
+          def source_link(path, line):
+              if repo and sha and path:
+                  return f"{server}/{repo}/blob/{sha}/{path}#L{line}"
+              return "#"
+
+          severity_counts = Counter(severity_of(r) for r in results)
+
+          severity_order = ["ERROR", "WARNING", "INFO", "INVENTORY", "EXPERIMENT"]
+          severity_cards = ""
+          for sev in severity_order:
+              severity_cards += f"""
+                <div class="card">
+                  <div class="card-label">{escape(sev)}</div>
+                  <div class="card-value">{severity_counts.get(sev, 0)}</div>
+                </div>
+              """
+
+          rows = ""
+
+          for idx, result in enumerate(results, start=1):
+              check_id = result.get("check_id", "")
+              path = result.get("path", "")
+              start = result.get("start", {}) or {}
+              end = result.get("end", {}) or {}
+              line = start.get("line", "")
+              col = start.get("col", "")
+              end_line = end.get("line", "")
+              extra = result.get("extra", {}) or {}
+              message = extra.get("message", "")
+              severity = severity_of(result)
+              metadata = extra.get("metadata", {}) or {}
+
+              cwe = metadata.get("cwe", "")
+              if isinstance(cwe, list):
+                  cwe = ", ".join(str(x) for x in cwe)
+
+              owasp = metadata.get("owasp", "")
+              if isinstance(owasp, list):
+                  owasp = ", ".join(str(x) for x in owasp)
+
+              references = metadata.get("references", "")
+              if isinstance(references, list):
+                  references_html = "<br>".join(
+                      f'<a href="{escape(str(ref))}" target="_blank">{escape(str(ref))}</a>'
+                      for ref in references
+                  )
+              elif references:
+                  references_html = escape(str(references))
+              else:
+                  references_html = "-"
+
+              link = source_link(path, line)
+
+              rows += f"""
+                <tr>
+                  <td>{idx}</td>
+                  <td><span class="badge badge-{escape(severity.lower())}">{escape(severity)}</span></td>
+                  <td><code>{escape(check_id)}</code></td>
+                  <td>
+                    <a href="{escape(link)}" target="_blank">{escape(path)}:{escape(str(line))}</a>
+                    <div class="muted">col: {escape(str(col))}, end line: {escape(str(end_line))}</div>
+                  </td>
+                  <td>{escape(message)}</td>
+                  <td>{escape(str(cwe)) if cwe else "-"}</td>
+                  <td>{escape(str(owasp)) if owasp else "-"}</td>
+                  <td>{references_html}</td>
+                </tr>
+              """
+
+          if not rows:
+              rows = """
+                <tr>
+                  <td colspan="8" class="empty">No Semgrep findings detected.</td>
+                </tr>
+              """
+
+          error_rows = ""
+          for err in errors:
+              error_rows += f"<li><code>{escape(str(err))}</code></li>"
+
+          if not error_rows:
+              error_rows = "<li>No Semgrep execution errors.</li>"
+
+          html = f"""<!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <title>Semgrep SAST Report</title>
+            <style>
+              body {{
+                font-family: Arial, sans-serif;
+                margin: 32px;
+                color: #1f2937;
+                background: #f9fafb;
+              }}
+              h1, h2 {{
+                margin-bottom: 8px;
+              }}
+              .meta {{
+                color: #6b7280;
+                margin-bottom: 24px;
+              }}
+              .cards {{
+                display: flex;
+                gap: 12px;
+                flex-wrap: wrap;
+                margin: 24px 0;
+              }}
+              .card {{
+                background: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 10px;
+                padding: 16px 20px;
+                min-width: 120px;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+              }}
+              .card-label {{
+                font-size: 12px;
+                color: #6b7280;
+                text-transform: uppercase;
+              }}
+              .card-value {{
+                font-size: 28px;
+                font-weight: 700;
+                margin-top: 4px;
+              }}
+              table {{
+                width: 100%;
+                border-collapse: collapse;
+                background: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 10px;
+                overflow: hidden;
+              }}
+              th, td {{
+                border-bottom: 1px solid #e5e7eb;
+                padding: 10px;
+                vertical-align: top;
+                font-size: 14px;
+              }}
+              th {{
+                background: #f3f4f6;
+                text-align: left;
+              }}
+              code {{
+                font-family: Consolas, Menlo, monospace;
+                font-size: 13px;
+              }}
+              a {{
+                color: #2563eb;
+                text-decoration: none;
+              }}
+              a:hover {{
+                text-decoration: underline;
+              }}
+              .badge {{
+                display: inline-block;
+                padding: 4px 8px;
+                border-radius: 999px;
+                font-size: 12px;
+                font-weight: 700;
+              }}
+              .badge-error {{
+                background: #fee2e2;
+                color: #991b1b;
+              }}
+              .badge-warning {{
+                background: #fef3c7;
+                color: #92400e;
+              }}
+              .badge-info {{
+                background: #dbeafe;
+                color: #1e40af;
+              }}
+              .badge-inventory, .badge-experiment {{
+                background: #e5e7eb;
+                color: #374151;
+              }}
+              .muted {{
+                color: #6b7280;
+                font-size: 12px;
+                margin-top: 4px;
+              }}
+              .empty {{
+                text-align: center;
+                color: #047857;
+                font-weight: 700;
+                padding: 24px;
+              }}
+              .errors {{
+                background: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 10px;
+                padding: 16px;
+              }}
+            </style>
+          </head>
+          <body>
+            <h1>Semgrep SAST Report</h1>
+            <div class="meta">
+              Repository: <code>{escape(repo)}</code><br>
+              Commit: <code>{escape(sha)}</code><br>
+              Workflow run: <code>{escape(run_id)}</code>
+            </div>
+
+            <div class="cards">
+              <div class="card">
+                <div class="card-label">Total findings</div>
+                <div class="card-value">{len(results)}</div>
+              </div>
+              {severity_cards}
+            </div>
+
+            <h2>Findings</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Severity</th>
+                  <th>Rule</th>
+                  <th>Location</th>
+                  <th>Message</th>
+                  <th>CWE</th>
+                  <th>OWASP</th>
+                  <th>References</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows}
+              </tbody>
+            </table>
+
+            <h2>Execution errors</h2>
+            <div class="errors">
+              <ul>
+                {error_rows}
+              </ul>
+            </div>
+          </body>
+          </html>
+          """
+
+          with open(output_file, "w", encoding="utf-8") as f:
+              f.write(html)
+
+          print(f"Generated {output_file}")
+          print(f"Findings: {len(results)}")
+          PY
+
+      - name: Upload Semgrep HTML report
+        id: upload-html
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-html-report
+          path: semgrep-report/index.html
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload Semgrep raw reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-raw-reports
+          path: |
+            semgrep-report/semgrep.json
+            semgrep-report/semgrep.sarif
+            semgrep-report/semgrep.txt
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload Semgrep SARIF to GitHub Code Scanning
+        if: always() && hashFiles('semgrep-report/semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep-report/semgrep.sarif
+          category: semgrep-sast
+
+      - name: Publish Semgrep summary
+        if: always()
+        shell: bash
+        run: |
+          FINDINGS_COUNT=$(python3 - <<'PY'
+          import json
+          with open("semgrep-report/semgrep.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
+          print(len(data.get("results", [])))
+          PY
+          )
+
+          {
+            echo "## Semgrep SAST"
+            echo ""
+            echo "| Item | Value |"
+            echo "|------|-------|"
+            echo "| Findings | ${FINDINGS_COUNT} |"
+            echo "| HTML report | [Download artifact](${{ steps.upload-html.outputs.artifact-url }}) |"
+            echo ""
+            echo "The HTML report is also available in the workflow artifacts as \`semgrep-html-report\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail pipeline when Semgrep found issues
+        if: always()
+        shell: bash
+        run: |
+          exit "${{ steps.semgrep.outputs.exit_code }}"
+
   docker:
     name: Docker checks
     runs-on: ubuntu-latest
-    needs: dotnet
+    needs:
+      - dotnet
+      - semgrep-sast
 
     steps:
       - uses: actions/checkout@v4
