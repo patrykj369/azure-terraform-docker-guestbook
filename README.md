@@ -1,6 +1,9 @@
 # Azure Terraform Docker Guestbook
 
 [![Deploy Development Environment](https://github.com/patrykj369/azure-terraform-docker-guestbook/actions/workflows/deploy-dev.yml/badge.svg)](https://github.com/patrykj369/azure-terraform-docker-guestbook/actions/workflows/deploy-dev.yml)
+
+---
+
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
 ![Azure](https://img.shields.io/badge/Azure-Cloud-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)
 ![Terraform](https://img.shields.io/badge/Terraform-IaC-844FBA?style=for-the-badge&logo=terraform&logoColor=white)
