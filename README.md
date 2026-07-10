@@ -95,9 +95,9 @@ flowchart LR
     GitHub --> Actions[GitHub Actions CI/CD]
 
     Actions --> Tests[Code Quality and Security Checks]
-    Actions --> Terraform[Terraform Plan & Apply]
-    Actions --> DockerBuild[Docker Build & Push]
-    Actions --> Deploy[Application Deployment]
+    Tests --> Terraform[Terraform Plan & Apply]
+    Tests --> DockerBuild[Docker Build & Push]
+    Tests --> Deploy[Application Deployment]
 
     Terraform --> RG[Azure Resource Group]
     Terraform --> VNet[Azure Virtual Network]
