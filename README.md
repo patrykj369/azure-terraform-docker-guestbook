@@ -82,8 +82,6 @@ Although the application is intentionally simple, it is used as a realistic work
 
 ### Semgrep SAST Report Example
 
-> Optional but recommended for CV/portfolio presentation.
-
 ![Deployment protection rules](docs/images/semgrep-sast-report-example.png)
 
 ---
