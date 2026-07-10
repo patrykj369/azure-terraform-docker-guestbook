@@ -55,20 +55,6 @@ Although the application is intentionally simple, it is used as a realistic work
 
 ![Azure architecture overview](docs/images/azure-architecture-overview.png)
 
-Recommended screenshot content:
-
-- Resource Group
-- Azure Container Apps Environment
-- Azure Container App
-- Azure Container Registry
-- Azure SQL Database
-- Virtual Network
-- Private Endpoint
-- Private DNS Zone
-- Key Vault
-- Log Analytics Workspace
-- Managed Identity
-
 ---
 
 ### Running Application
@@ -76,12 +62,6 @@ Recommended screenshot content:
 > Place a screenshot of the running Guestbook application after deployment.
 
 ![Running Guestbook application](docs/images/guestbook-application.png)
-
-Recommended screenshot content:
-
-- Guestbook form
-- Existing guest entries
-- Public application URL from Azure Container Apps
 
 ---
 
@@ -106,15 +86,21 @@ Recommended screenshot content:
 
 ![GitHub Actions pipeline](docs/images/github-actions-pipeline.png)
 
-Recommended screenshot content:
+---
 
-- Code quality and security checks
-- Terraform plan
-- Manual approval
-- Terraform apply
-- Docker image build
-- Azure deployment
+### Deployment protection rules
 
+> Optional but recommended for CV/portfolio presentation.
+
+![Deployment protection rules] (docs/images/deployment-protection-rules.png)
+
+---
+
+### Semgrep SAST Report Example
+
+> Optional but recommended for CV/portfolio presentation.
+
+![Deployment protection rules] (docs/images/semgrep-sast-report-example.png)
 ---
 
 ## High-Level Architecture
@@ -354,6 +340,14 @@ The `dev-approval` environment is used as a manual approval gate before applying
 │       ├── deploy-dev.yml
 │       ├── infra-apply.yml
 │       └── infra-plan.yml
+├── docs/
+│   └── images/
+│       ├── azure-architecture-overview.png
+│       ├── deployment-protection-rules.png
+│       ├── github-actions-pipeline.png
+│       ├── guestbook-application.png
+│       ├── semgrep-sast-report-example.png
+│       └── terraform-iac-structure.png
 │
 ├── infra/
 │   ├── environments/
