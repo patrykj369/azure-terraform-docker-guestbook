@@ -51,15 +51,11 @@ Although the application is intentionally simple, it is used as a realistic work
 
 ### Azure Architecture Overview
 
-> Place a screenshot from the Azure Portal or an architecture diagram showing the deployed Azure resources.
-
 ![Azure architecture overview](docs/images/azure-architecture-overview.png)
 
 ---
 
 ### Running Application
-
-> Place a screenshot of the running Guestbook application after deployment.
 
 ![Running Guestbook application](docs/images/guestbook-application.png)
 
@@ -67,22 +63,12 @@ Although the application is intentionally simple, it is used as a realistic work
 
 ### Terraform Infrastructure as Code
 
-> Place a screenshot from VS Code, Terraform graph, or repository structure showing the Infrastructure as Code layout.
-
 ![Terraform IaC structure](docs/images/terraform-iac-structure.png)
 
-Recommended screenshot content:
-
-- `infra/environments/dev/main.tf`
-- Terraform modules
-- Azure resource definitions
-- Environment-specific configuration
 
 ---
 
 ### CI/CD Pipeline Run
-
-> Optional but recommended for CV/portfolio presentation.
 
 ![GitHub Actions pipeline](docs/images/github-actions-pipeline.png)
 
@@ -90,9 +76,7 @@ Recommended screenshot content:
 
 ### Deployment protection rules
 
-> Optional but recommended for CV/portfolio presentation.
-
-![Deployment protection rules] (docs/images/deployment-protection-rules.png)
+![Deployment protection rules](docs/images/deployment-protection-rules.png)
 
 ---
 
@@ -100,7 +84,8 @@ Recommended screenshot content:
 
 > Optional but recommended for CV/portfolio presentation.
 
-![Deployment protection rules] (docs/images/semgrep-sast-report-example.png)
+![Deployment protection rules](docs/images/semgrep-sast-report-example.png)
+
 ---
 
 ## High-Level Architecture
