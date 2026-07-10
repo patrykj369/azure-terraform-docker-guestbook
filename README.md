@@ -63,7 +63,7 @@ Although the application is intentionally simple, it is used as a realistic work
 
 ### Terraform Infrastructure as Code
 
-![Terraform IaC structure](docs/images/terraform-iac-structure.png)
+![Terraform IaC structure](docs/images/terraform-guestbook-architecture.svg)
 
 
 ---
@@ -332,7 +332,7 @@ The `dev-approval` environment is used as a manual approval gate before applying
 │       ├── github-actions-pipeline.png
 │       ├── guestbook-application.png
 │       ├── semgrep-sast-report-example.png
-│       └── terraform-iac-structure.png
+│       └── terraform-guestbook-architecture.svg
 │
 ├── infra/
 │   ├── environments/
