@@ -416,33 +416,6 @@ This project demonstrates practical experience with:
 
 ---
 
-## Project Purpose
-
-This repository was created as a hands-on DevOps engineering project and portfolio showcase.
-
-It presents a complete delivery path from source code to cloud deployment, including infrastructure provisioning, security validation, container image management and automated deployment to Azure.
-
-The project is suitable for demonstrating practical DevOps, Cloud and Infrastructure as Code skills in a professional CV or technical portfolio.
-
----
-
-## Future Improvements
-
-Possible next steps:
-
-- Add Azure Front Door with WAF
-- Add custom domain and TLS certificate
-- Replace SQL password authentication with managed identity authentication
-- Store application secrets fully in Azure Key Vault
-- Add application health checks
-- Add integration tests
-- Add Terraform documentation generation
-- Add architecture diagram generated from IaC
-- Add monitoring dashboards and alerts
-- Add production environment with separate approval flow
-
----
-
 ## Author
 
 Created by **Patryk Jabłoński**.
