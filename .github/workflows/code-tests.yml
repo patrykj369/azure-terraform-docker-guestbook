@@ -17,30 +17,31 @@ jobs:
 
     defaults:
       run:
-       working-directory: ./src/Guestbook.Api
+        working-directory: ./src/Guestbook.Api
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 10.0.x
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
 
-    - name: Restore
-      run: dotnet restore GuestBook.csproj
+      - name: Restore
+        run: dotnet restore GuestBook.csproj
 
-    - name: Build
-      run: dotnet build GuestBook.csproj --configuration Release --no-restore
+      - name: Build
+        run: dotnet build GuestBook.csproj --configuration Release --no-restore
 
-    - name: Test
-      run: dotnet test GuestBook.csproj --configuration Release --no-build
+      - name: Test
+        run: dotnet test GuestBook.csproj --configuration Release --no-build
 
-    - name: Check formatting
-      run: dotnet format GuestBook.csproj --verify-no-changes
+      - name: Check formatting
+        run: dotnet format GuestBook.csproj --verify-no-changes
 
-    - name: Check vulnerable NuGet packages
-      run: dotnet list GuestBook.csproj package --vulnerable --include-transitive
+      - name: Check vulnerable NuGet packages
+        run: dotnet list GuestBook.csproj package --vulnerable --include-transitive
 
   semgrep-sast:
     name: Semgrep SAST
@@ -48,14 +49,19 @@ jobs:
     needs: dotnet
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Run Semgrep SAST
         id: semgrep
         shell: bash
         run: |
+          set -uo pipefail
+
           mkdir -p semgrep-report
 
+          # Semgrep is allowed to finish with a non-zero code here.
+          # The final validation step decides whether the job should fail.
           set +e
 
           docker run --rm \
@@ -65,7 +71,6 @@ jobs:
             semgrep scan \
               --config p/default \
               --metrics=off \
-              --error \
               --text \
               --output semgrep-report/semgrep.txt \
               --json-output semgrep-report/semgrep.json \
@@ -74,14 +79,26 @@ jobs:
 
           SEMGREP_EXIT_CODE=$?
 
+          set -e
+
           echo "exit_code=${SEMGREP_EXIT_CODE}" >> "$GITHUB_OUTPUT"
 
-          if [ ! -f semgrep-report/semgrep.json ]; then
-            echo '{"results":[],"errors":[{"message":"Semgrep did not generate JSON output."}]}' > semgrep-report/semgrep.json
+          if [ ! -f "semgrep-report/semgrep.json" ]; then
+            cat > "semgrep-report/semgrep.json" <<'JSON'
+          {
+            "results": [],
+            "errors": [
+              {
+                "level": "error",
+                "message": "Semgrep did not generate a JSON report."
+              }
+            ]
+          }
+          JSON
           fi
 
-          if [ ! -f semgrep-report/semgrep.txt ]; then
-            echo "Semgrep did not generate text output." > semgrep-report/semgrep.txt
+          if [ ! -f "semgrep-report/semgrep.txt" ]; then
+            echo "Semgrep did not generate a text report." > "semgrep-report/semgrep.txt"
           fi
 
           exit 0
@@ -89,17 +106,19 @@ jobs:
       - name: Convert Semgrep JSON to HTML
         shell: bash
         run: |
+          set -euo pipefail
+
           python3 <<'PY'
           import json
           import os
-          from html import escape
           from collections import Counter
+          from html import escape
 
           input_file = "semgrep-report/semgrep.json"
           output_file = "semgrep-report/index.html"
 
-          with open(input_file, "r", encoding="utf-8") as f:
-              data = json.load(f)
+          with open(input_file, "r", encoding="utf-8") as file:
+              data = json.load(file)
 
           results = data.get("results", [])
           errors = data.get("errors", [])
@@ -118,21 +137,29 @@ jobs:
                   return f"{server}/{repo}/blob/{sha}/{path}#L{line}"
               return "#"
 
-          severity_counts = Counter(severity_of(r) for r in results)
+          severity_counts = Counter(severity_of(result) for result in results)
 
-          severity_order = ["ERROR", "WARNING", "INFO", "INVENTORY", "EXPERIMENT"]
+          severity_order = [
+              "ERROR",
+              "WARNING",
+              "INFO",
+              "INVENTORY",
+              "EXPERIMENT",
+          ]
+
           severity_cards = ""
-          for sev in severity_order:
+
+          for severity in severity_order:
               severity_cards += f"""
                 <div class="card">
-                  <div class="card-label">{escape(sev)}</div>
-                  <div class="card-value">{severity_counts.get(sev, 0)}</div>
+                  <div class="card-label">{escape(severity)}</div>
+                  <div class="card-value">{severity_counts.get(severity, 0)}</div>
                 </div>
               """
 
           rows = ""
 
-          for idx, result in enumerate(results, start=1):
+          for index, result in enumerate(results, start=1):
               check_id = result.get("check_id", "")
               path = result.get("path", "")
               start = result.get("start", {}) or {}
@@ -147,17 +174,19 @@ jobs:
 
               cwe = metadata.get("cwe", "")
               if isinstance(cwe, list):
-                  cwe = ", ".join(str(x) for x in cwe)
+                  cwe = ", ".join(str(value) for value in cwe)
 
               owasp = metadata.get("owasp", "")
               if isinstance(owasp, list):
-                  owasp = ", ".join(str(x) for x in owasp)
+                  owasp = ", ".join(str(value) for value in owasp)
 
               references = metadata.get("references", "")
+
               if isinstance(references, list):
                   references_html = "<br>".join(
-                      f'<a href="{escape(str(ref))}" target="_blank">{escape(str(ref))}</a>'
-                      for ref in references
+                      f'<a href="{escape(str(reference))}" '
+                      f'target="_blank">{escape(str(reference))}</a>'
+                      for reference in references
                   )
               elif references:
                   references_html = escape(str(references))
@@ -168,12 +197,21 @@ jobs:
 
               rows += f"""
                 <tr>
-                  <td>{idx}</td>
-                  <td><span class="badge badge-{escape(severity.lower())}">{escape(severity)}</span></td>
+                  <td>{index}</td>
+                  <td>
+                    <span class="badge badge-{escape(severity.lower())}">
+                      {escape(severity)}
+                    </span>
+                  </td>
                   <td><code>{escape(check_id)}</code></td>
                   <td>
-                    <a href="{escape(link)}" target="_blank">{escape(path)}:{escape(str(line))}</a>
-                    <div class="muted">col: {escape(str(col))}, end line: {escape(str(end_line))}</div>
+                    <a href="{escape(link)}" target="_blank">
+                      {escape(path)}:{escape(str(line))}
+                    </a>
+                    <div class="muted">
+                      col: {escape(str(col))},
+                      end line: {escape(str(end_line))}
+                    </div>
                   </td>
                   <td>{escape(message)}</td>
                   <td>{escape(str(cwe)) if cwe else "-"}</td>
@@ -185,13 +223,18 @@ jobs:
           if not rows:
               rows = """
                 <tr>
-                  <td colspan="8" class="empty">No Semgrep findings detected.</td>
+                  <td colspan="8" class="empty">
+                    No Semgrep findings detected.
+                  </td>
                 </tr>
               """
 
           error_rows = ""
-          for err in errors:
-              error_rows += f"<li><code>{escape(str(err))}</code></li>"
+
+          for error in errors:
+              error_rows += (
+                  f"<li><code>{escape(str(error))}</code></li>"
+              )
 
           if not error_rows:
               error_rows = "<li>No Semgrep execution errors.</li>"
@@ -227,7 +270,7 @@ jobs:
                 border-radius: 10px;
                 padding: 16px 20px;
                 min-width: 120px;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
               }}
               .card-label {{
                 font-size: 12px;
@@ -287,7 +330,8 @@ jobs:
                 background: #dbeafe;
                 color: #1e40af;
               }}
-              .badge-inventory, .badge-experiment {{
+              .badge-inventory,
+              .badge-experiment {{
                 background: #e5e7eb;
                 color: #374151;
               }}
@@ -312,6 +356,7 @@ jobs:
           </head>
           <body>
             <h1>Semgrep SAST Report</h1>
+
             <div class="meta">
               Repository: <code>{escape(repo)}</code><br>
               Commit: <code>{escape(sha)}</code><br>
@@ -327,6 +372,7 @@ jobs:
             </div>
 
             <h2>Findings</h2>
+
             <table>
               <thead>
                 <tr>
@@ -346,6 +392,7 @@ jobs:
             </table>
 
             <h2>Execution errors</h2>
+
             <div class="errors">
               <ul>
                 {error_rows}
@@ -355,8 +402,8 @@ jobs:
           </html>
           """
 
-          with open(output_file, "w", encoding="utf-8") as f:
-              f.write(html)
+          with open(output_file, "w", encoding="utf-8") as file:
+              file.write(html)
 
           print(f"Generated {output_file}")
           print(f"Findings: {len(results)}")
@@ -394,11 +441,21 @@ jobs:
       - name: Publish Semgrep summary
         if: always()
         shell: bash
+        env:
+          ARTIFACT_URL: ${{ steps.upload-html.outputs.artifact-url }}
         run: |
+          set -euo pipefail
+
           FINDINGS_COUNT=$(python3 - <<'PY'
           import json
-          with open("semgrep-report/semgrep.json", "r", encoding="utf-8") as f:
-              data = json.load(f)
+
+          with open(
+              "semgrep-report/semgrep.json",
+              "r",
+              encoding="utf-8",
+          ) as file:
+              data = json.load(file)
+
           print(len(data.get("results", [])))
           PY
           )
@@ -409,7 +466,7 @@ jobs:
             echo "| Item | Value |"
             echo "|------|-------|"
             echo "| Findings | ${FINDINGS_COUNT} |"
-            echo "| HTML report | [Download artifact](${{ steps.upload-html.outputs.artifact-url }}) |"
+            echo "| HTML report | [Download artifact](${ARTIFACT_URL}) |"
             echo ""
             echo "The HTML report is also available in the workflow artifacts as \`semgrep-html-report\`."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -417,8 +474,12 @@ jobs:
       - name: Fail pipeline only on Semgrep errors
         if: always()
         shell: bash
+        env:
+          SEMGREP_EXIT_CODE: ${{ steps.semgrep.outputs.exit_code }}
         run: |
-          REPORT="semgrep-results.json"
+          set -euo pipefail
+
+          REPORT="semgrep-report/semgrep.json"
 
           if [ ! -f "$REPORT" ]; then
             echo "::error::Semgrep JSON report was not generated: $REPORT"
@@ -428,7 +489,9 @@ jobs:
           ERROR_COUNT=$(jq '
             [
               .results[]?
-              | select((.extra.severity // "") == "ERROR")
+              | select(
+                  ((.extra.severity // "") | ascii_upcase) == "ERROR"
+                )
             ]
             | length
           ' "$REPORT")
@@ -436,21 +499,59 @@ jobs:
           WARNING_COUNT=$(jq '
             [
               .results[]?
-              | select((.extra.severity // "") == "WARNING")
+              | select(
+                  ((.extra.severity // "") | ascii_upcase) == "WARNING"
+                )
             ]
             | length
           ' "$REPORT")
 
+          EXECUTION_ERROR_COUNT=$(jq '
+            [
+              .errors[]?
+              | select(
+                  ((.level // "") | ascii_downcase) == "error"
+                )
+            ]
+            | length
+          ' "$REPORT")
+
+          EXECUTION_WARNING_COUNT=$(jq '
+            [
+              .errors[]?
+              | select(
+                  ((.level // "") | ascii_downcase) == "warn"
+                )
+            ]
+            | length
+          ' "$REPORT")
+
+          echo "Semgrep exit code: ${SEMGREP_EXIT_CODE:-unknown}"
           echo "Semgrep findings:"
-          echo "  ERROR:   $ERROR_COUNT"
-          echo "  WARNING: $WARNING_COUNT"
+          echo "  ERROR:              $ERROR_COUNT"
+          echo "  WARNING:            $WARNING_COUNT"
+          echo "  Execution errors:   $EXECUTION_ERROR_COUNT"
+          echo "  Execution warnings: $EXECUTION_WARNING_COUNT"
 
           if [ "$ERROR_COUNT" -gt 0 ]; then
             echo "::error::Semgrep found $ERROR_COUNT finding(s) with ERROR severity."
             exit 1
           fi
 
-          echo "No ERROR findings detected. WARNING findings do not block the pipeline."
+          if [ "$EXECUTION_ERROR_COUNT" -gt 0 ]; then
+            echo "::error::Semgrep encountered $EXECUTION_ERROR_COUNT execution error(s)."
+            exit 1
+          fi
+
+          if [ "$WARNING_COUNT" -gt 0 ]; then
+            echo "::warning::Semgrep found $WARNING_COUNT warning finding(s)."
+          fi
+
+          if [ "$EXECUTION_WARNING_COUNT" -gt 0 ]; then
+            echo "::warning::Semgrep encountered $EXECUTION_WARNING_COUNT parser or execution warning(s)."
+          fi
+
+          echo "No blocking Semgrep errors detected."
           exit 0
 
   docker:
@@ -461,7 +562,8 @@ jobs:
       - semgrep-sast
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
@@ -469,7 +571,12 @@ jobs:
           dockerfile: Dockerfile
 
       - name: Build Docker image
-        run: docker build --pull -t guestbook-image:${{ github.sha }} .
+        shell: bash
+        env:
+          IMAGE_TAG: guestbook-image:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker build --pull -t "$IMAGE_TAG" .
 
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@master
