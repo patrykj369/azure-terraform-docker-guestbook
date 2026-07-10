@@ -52,6 +52,7 @@ module "subnet_container_apps_environment" {
   resource_group_name  = module.resource_group.name
   virtual_network_name = module.virtual_network.name
   address_prefixes     = ["10.0.1.0/26"]
+  service_endpoints    = ["Microsoft.KeyVault"]
 
   delegation = {
     name         = "delegation-container-apps-${local.environment}"
@@ -154,6 +155,11 @@ module "key_vault" {
   app_managed_identity_name         = module.managed_identity.id
 
   key_vault_admin_principal_ids = var.key_vault_admin_principal_ids
+
+  network_acl_ip_rules = var.key_vault_network_acl_ip_rules
+  network_acl_subnet_ids = [
+    module.subnet_container_apps_environment.id
+  ]
 }
 
 module "container_app_environment" {

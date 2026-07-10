@@ -84,6 +84,12 @@ variable "key_vault_admin_principal_ids" {
   default     = []
 }
 
+variable "key_vault_network_acl_ip_rules" {
+  description = "Public IPv4 addresses or CIDR ranges allowed to access the Key Vault data plane in addition to the Container Apps subnet."
+  type        = list(string)
+  default     = []
+}
+
 variable "container_app_environment_name" {
   description = "Container App Environment name"
   type        = string

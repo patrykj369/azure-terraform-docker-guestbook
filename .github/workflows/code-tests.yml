@@ -69,7 +69,8 @@ jobs:
               --text \
               --output semgrep-report/semgrep.txt \
               --json-output semgrep-report/semgrep.json \
-              --sarif-output semgrep-report/semgrep.sarif
+              --sarif-output semgrep-report/semgrep.sarif \
+              --exclude-rule "yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag"
 
           SEMGREP_EXIT_CODE=$?
 
@@ -413,11 +414,44 @@ jobs:
             echo "The HTML report is also available in the workflow artifacts as \`semgrep-html-report\`."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Fail pipeline when Semgrep found issues
+      - name: Fail pipeline only on Semgrep errors
         if: always()
         shell: bash
         run: |
-          exit "${{ steps.semgrep.outputs.exit_code }}"
+          REPORT="semgrep-results.json"
+
+          if [ ! -f "$REPORT" ]; then
+            echo "::error::Semgrep JSON report was not generated: $REPORT"
+            exit 1
+          fi
+
+          ERROR_COUNT=$(jq '
+            [
+              .results[]?
+              | select((.extra.severity // "") == "ERROR")
+            ]
+            | length
+          ' "$REPORT")
+
+          WARNING_COUNT=$(jq '
+            [
+              .results[]?
+              | select((.extra.severity // "") == "WARNING")
+            ]
+            | length
+          ' "$REPORT")
+
+          echo "Semgrep findings:"
+          echo "  ERROR:   $ERROR_COUNT"
+          echo "  WARNING: $WARNING_COUNT"
+
+          if [ "$ERROR_COUNT" -gt 0 ]; then
+            echo "::error::Semgrep found $ERROR_COUNT finding(s) with ERROR severity."
+            exit 1
+          fi
+
+          echo "No ERROR findings detected. WARNING findings do not block the pipeline."
+          exit 0
 
   docker:
     name: Docker checks

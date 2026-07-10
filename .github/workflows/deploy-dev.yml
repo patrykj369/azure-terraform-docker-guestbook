@@ -16,13 +16,11 @@ jobs:
   code-tests:
     name: Code Quality and Security Tests
     uses: ./.github/workflows/code-tests.yml
-    secrets: inherit
 
   infra-plan:
     needs: code-tests
     name: Terraform Plan
     uses: ./.github/workflows/infra-plan.yml
-    secrets: inherit
 
   approve-dev:
     needs: infra-plan
@@ -37,13 +35,11 @@ jobs:
     needs: approve-dev
     name: Terraform Apply
     uses: ./.github/workflows/infra-apply.yml
-    secrets: inherit
     
   app-build:
     needs: infra-apply
     name: Build and Push Application
     uses: ./.github/workflows/app-build.yml
-    secrets: inherit
 
   app-deploy:
     needs: app-build
@@ -51,4 +47,3 @@ jobs:
     uses: ./.github/workflows/app-deploy.yml
     with:
       image-tag: ${{ needs.app-build.outputs.image-tag }}
-    secrets: inherit

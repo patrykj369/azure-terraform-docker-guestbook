@@ -52,3 +52,13 @@ variable "key_vault_admin_principal_ids" {
   default     = []
 }
 
+variable "network_acl_ip_rules" {
+  type    = list(string)
+  default = []
+}
+
+variable "network_acl_subnet_ids" {
+  type    = list(string)
+  default = []
+}
+

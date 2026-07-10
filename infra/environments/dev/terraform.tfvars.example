@@ -8,9 +8,15 @@ acr_sku                      = "Basic"
 sql_server_name              = "sqlserver-guestbook-dev"
 sql_database_name            = "sqldb-guestbook-dev"
 sql_admin_login              = "sqladmin"
-sql_admin_password           = "P@ssw0rd1234!"  # Change to secure password
+sql_admin_password           = "P@ssw0rd1234!" #change password
 sql_sku_name                 = "Basic"
 key_vault_name               = "kv-guestbook-dev"
+key_vault_admin_principal_ids = [
+	"00000000-0000-0000-0000-000000000000"
+]
+key_vault_network_acl_ip_rules = [
+	"203.0.113.10/32"
+]
 container_app_environment_name    = "cae-guestbook-dev"
 log_analytics_workspace_name = "law-guestbook-dev"
 log_analytics_sku            = "PerGB2018"

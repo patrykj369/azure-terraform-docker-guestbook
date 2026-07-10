@@ -18,6 +18,12 @@ variable "address_prefixes" {
   type        = list(string)
 }
 
+variable "service_endpoints" {
+  description = "Optional list of service endpoints to enable on the subnet."
+  type        = list(string)
+  default     = []
+}
+
 variable "delegation" {
   description = "Optional subnet delegation configuration."
   type = object({

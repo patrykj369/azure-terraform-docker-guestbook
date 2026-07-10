@@ -8,6 +8,13 @@ resource "azurerm_key_vault" "main" {
   purge_protection_enabled    = false
   enable_rbac_authorization   = true # Use RBAC instead of access policies
 
+  network_acls {
+    bypass                     = "AzureServices"
+    default_action             = "Deny"
+    ip_rules                   = var.network_acl_ip_rules
+    virtual_network_subnet_ids = var.network_acl_subnet_ids
+  }
+
   tags = var.common_tags
 }
 

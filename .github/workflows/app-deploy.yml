@@ -48,10 +48,18 @@ jobs:
       - name: Determine Image Tag
         id: image
         shell: bash
+        env:
+          INPUT_IMAGE_TAG: ${{ inputs.image-tag }}
         run: |
           set -euo pipefail
 
-          IMAGE_TAG="${{ inputs.image-tag }}"
+          IMAGE_TAG="${INPUT_IMAGE_TAG}"
+
+          if [[ ! "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "Invalid Docker image tag."
+            exit 1
+          fi
+          
           IMAGE_URI="${AZURE_REGISTRY_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
 
           echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
@@ -144,16 +152,19 @@ jobs:
 
       - name: Verify Image Exists in ACR
         shell: bash
+        env:
+          ACR_NAME: ${{ steps.acr.outputs.name }}
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
         run: |
           set -euo pipefail
 
           az acr repository show \
-            --name "${{ steps.acr.outputs.name }}" \
-            --image "${IMAGE_NAME}:${{ steps.image.outputs.tag }}" \
+            --name "$ACR_NAME" \
+            --image "${IMAGE_NAME}:${IMAGE_TAG}" \
             --only-show-errors \
             1>/dev/null
 
-          echo "Image found in ACR: ${IMAGE_NAME}:${{ steps.image.outputs.tag }}"
+          echo "Image found in ACR: ${IMAGE_NAME}:${IMAGE_TAG}"
 
       - name: Verify Container Apps Environment Exists
         shell: bash
@@ -293,6 +304,8 @@ jobs:
 
       - name: Output Deployment Details
         shell: bash
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
         run: |
           set -euo pipefail
 
@@ -307,7 +320,7 @@ jobs:
           echo "- Container App: ${AZURE_CONTAINER_APP_NAME}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Resource Group: ${AZURE_RESOURCE_GROUP}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Container Apps Environment: ${AZURE_CONTAINER_APP_ENVIRONMENT_NAME}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Image: ${{ steps.image.outputs.uri }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image: ${IMAGE_URI}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Target port: ${AZURE_CONTAINER_APP_TARGET_PORT}" >> "$GITHUB_STEP_SUMMARY"
           echo "- SQL Server: ${SQL_SERVER_NAME}.database.windows.net" >> "$GITHUB_STEP_SUMMARY"
           echo "- SQL Database: ${SQL_DATABASE_NAME}" >> "$GITHUB_STEP_SUMMARY"
